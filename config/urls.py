@@ -17,6 +17,15 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+from django.contrib import admin
+from django.urls import path, include
+from django.http import HttpResponse
+
+def home(_):
+    return HttpResponse("<h1>FinanceBuddy</h1><p>Welcome.</p><p><a href='/accounts/signup/'>Sign up</a> | <a href='/accounts/login/'>Log in</a></p>")
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path("admin/", admin.site.urls),
+    path("", home, name="home"),
+    path("accounts/", include("allauth.urls")),  # /accounts/login, /accounts/signup, etc.
 ]
