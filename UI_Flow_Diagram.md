@@ -7,14 +7,14 @@ graph TD
     A[Landing Page] --> B{User Authenticated?}
     B -->|No| C[Login/Register]
     B -->|Yes| D[Dashboard]
-    
+
     C --> E[Authentication]
     E --> D
-    
+
     D --> F[Quick Calculator]
     D --> G[Recent Predictions]
     D --> H[Market Data]
-    
+
     F --> I[Options Calculator Page]
     I --> J[Input Parameters]
     J --> K[Market Data Integration]
@@ -22,24 +22,24 @@ graph TD
     L --> M[Results Display]
     M --> N[Greeks Visualization]
     N --> O[Save Prediction]
-    
+
     O --> P[Portfolio Page]
     P --> Q[Saved Predictions List]
     Q --> R[Filter/Search]
     Q --> S[Export Data]
     Q --> T[Delete Prediction]
-    
+
     M --> U[AI Assistant]
     U --> V[Chat Interface]
     V --> W[OpenAI Integration]
     W --> X[Educational Explanations]
-    
+
     D --> Y[Settings Page]
     Y --> Z[User Profile]
     Y --> AA[API Configuration]
     Y --> BB[Display Preferences]
     Y --> CC[Data Management]
-    
+
     style A fill:#e1f5fe
     style D fill:#f3e5f5
     style I fill:#e8f5e8
@@ -60,7 +60,7 @@ graph LR
         E[AI Assistant Component]
         F[Settings Component]
     end
-    
+
     subgraph "Backend (Spring Boot)"
         G[Auth Controller]
         H[Calculator Controller]
@@ -68,28 +68,28 @@ graph LR
         J[AI Controller]
         K[Settings Controller]
     end
-    
+
     subgraph "External APIs"
         L[TwelveData API]
         M[OpenAI API]
     end
-    
+
     subgraph "Database"
         N[Users Table]
         O[Predictions Table]
         P[Settings Table]
     end
-    
+
     A --> G
     B --> H
     C --> H
     D --> I
     E --> J
     F --> K
-    
+
     H --> L
     J --> M
-    
+
     G --> N
     I --> O
     K --> P
