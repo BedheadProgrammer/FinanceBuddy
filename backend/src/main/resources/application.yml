@@ -1,0 +1,66 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: financebuddy-backend
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/financebuddy
+    username: ${DB_USERNAME:financebuddy}
+    password: ${DB_PASSWORD:financebuddy}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  
+  security:
+    jwt:
+      secret: ${JWT_SECRET:your-secret-key-here-change-in-production}
+      expiration: 86400000 # 24 hours
+
+# External API Configuration
+market-data:
+  twelve-data:
+    api-key: ${TWELVEDATA_API_KEY:your-api-key}
+    base-url: https://api.twelvedata.com
+    timeout: 5000
+
+openai:
+  api-key: ${OPENAI_API_KEY:your-openai-key}
+  base-url: https://api.openai.com/v1
+  model: gpt-3.5-turbo
+  max-tokens: 500
+  temperature: 0.7
+
+# Logging
+logging:
+  level:
+    com.financebuddy: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
