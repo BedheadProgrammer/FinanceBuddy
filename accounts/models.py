@@ -20,8 +20,8 @@ class AuditLog(models.Model):
     id = models.AutoField(primary_key=True)
     Date_Created = models.DateTimeField(auto_now_add=True)
     ACTION_CHOICES = [
-        ("Login"),
-        ("Logout"),
+        ("Login", "Login"),
+        ("Logout", "Logout"),
     ]
     Action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     Username = models.ForeignKey(UserAccounts, to_field="Username", on_delete=models.CASCADE)
