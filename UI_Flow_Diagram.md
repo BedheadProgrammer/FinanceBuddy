@@ -99,7 +99,6 @@ graph LR
 
 ### 1. **Authentication System**
 - Secure login/registration
-- JWT token-based sessions
 - Password reset functionality
 
 ### 2. **Options Calculator**
@@ -119,11 +118,6 @@ graph LR
 - Export/import functionality
 - Search and filter capabilities
 
-### 5. **Responsive Design**
-- Mobile-first approach
-- Touch-friendly interfaces
-- Progressive Web App capabilities
-
 ## Technical Stack
 
 ### Frontend
@@ -133,10 +127,8 @@ graph LR
 - Axios for API calls
 
 ### Backend
-- Spring Boot with Java
-- JWT authentication
+- Django with Python
 - PostgreSQL database
-- RESTful API endpoints
 
 ### External Integrations
 - TwelveData API for market data
