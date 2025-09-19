@@ -52,7 +52,7 @@ graph TD
 
 ```mermaid
 graph LR
-    subgraph "Frontend (React)"
+    subgraph "Frontend "
         A[Landing Component]
         B[Dashboard Component]
         C[Calculator Component]
