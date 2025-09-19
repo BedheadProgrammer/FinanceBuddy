@@ -1,6 +1,13 @@
 from django.db import models
+#Creates the tables in the PostgreSQL database
 
+#User Account table stores users
 
+#Audit Log stores when the user loggedin/logged out
+
+#Saved Runs stores the saved option pricing runs
+
+#OpenAIAPIResponse stores the OpenAI API responses
 
 
 # Create your models here.
