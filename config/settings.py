@@ -92,7 +92,6 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Use our custom user model
-AUTH_USER_MODEL = "accounts.User"
 
 # Allauth configuration (email verification)
 AUTHENTICATION_BACKENDS = (
