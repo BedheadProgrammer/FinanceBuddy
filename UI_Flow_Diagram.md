@@ -61,7 +61,7 @@ graph LR
         F[Settings Component]
     end
 
-    subgraph "Backend (Spring Boot)"
+    subgraph "Backend (Django)"
         G[Auth Controller]
         H[Calculator Controller]
         I[Portfolio Controller]
@@ -124,7 +124,6 @@ graph LR
 - React with TypeScript
 - Material-UI or Tailwind CSS
 - Chart.js for visualization
-- Axios for API calls
 
 ### Backend
 - Django with Python
@@ -133,4 +132,4 @@ graph LR
 ### External Integrations
 - TwelveData API for market data
 - OpenAI API for explanations
-- Cloud hosting (AWS/Azure/GCP)
+
