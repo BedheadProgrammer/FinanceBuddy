@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load account %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white/5 rounded-2xl p-6">
+  <h1 class="text-2xl font-semibold mb-4">Sign in</h1>
+  <form method="post" action="{% url 'account_login' %}" class="space-y-4">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div>
+      <label class="block mb-1">Username or email</label>
+      {{ form.login|add_class:"px-3 py-2 w-full rounded-xl bg-white/10" }}
+    </div>
+    <div>
+      <label class="block mb-1">Password</label>
+      {{ form.password|add_class:"px-3 py-2 w-full rounded-xl bg-white/10" }}
+    </div>
+    <button class="px-4 py-2 rounded-xl bg-blue-500 text-white w-full">Sign in</button>
+  </form>
+  <p class="mt-4 text-sm opacity-80">
+    No account? <a href="{% url 'account_signup' %}" class="underline">Register</a>
+  </p>
+</div>
+{% endblock %}
