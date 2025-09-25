@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Market Watch{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Market Watch</h1>
+<form method="post" class="flex gap-2 flex-wrap mb-6">
+  {% csrf_token %}
+  <input type="text" name="symbols" placeholder="AAPL,MSFT,BRK.B"
+         class="px-3 py-2 rounded-xl bg-white/10 min-w-[280px]" />
+  <button type="submit" class="px-4 py-2 rounded-xl bg-blue-500 text-white">Lookup</button>
+  <button type="submit" name="popular" value="1" class="px-4 py-2 rounded-xl bg-white/10">Popular</button>
+</form>
+
+{% if results %}
+  <div class="overflow-x-auto bg-white/5 rounded-2xl">
+    <table class="min-w-full text-left">
+      <thead class="opacity-80">
+        <tr>
+          <th class="px-4 py-3">Symbol</th>
+          <th class="px-4 py-3">Price</th>
+          <th class="px-4 py-3">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sym, row in results.items %}
+          <tr class="border-t border-white/10">
+            <td class="px-4 py-3 font-mono">{{ sym }}</td>
+            <td class="px-4 py-3">{% if row.price %}{{ row.price }}{% else %}—{% endif %}</td>
+            <td class="px-4 py-3">{% if row.error %}<span class="text-red-400">{{ row.error }}</span>{% else %}OK{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}
