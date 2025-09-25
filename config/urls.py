@@ -1,31 +1,31 @@
-"""
-URL configuration for config project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
+# config/urls.py
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path, include
+from django.views.static import serve as static_serve
+from django.conf import settings
+from django.http import FileResponse
 
-from django.contrib import admin
-from django.urls import path, include
-from django.http import HttpResponse
-
-def home(_):
-    return HttpResponse("<h1>FinanceBuddy</h1><p>Welcome.</p><p><a href='/accounts/signup/'>Sign up</a> | <a href='/accounts/login/'>Log in</a></p>")
+def spa_index(_request, unused=None):
+    index = settings.BASE_DIR / "frontend" / "dist" / "index.html"
+    return FileResponse(open(index, "rb"))
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", home, name="home"),
-    path("accounts/", include("allauth.urls")),  # /accounts/login, /accounts/signup, etc.
+    path("accounts/", include("allauth.urls")),
+    path("api/", include(("api.urls", "api"), namespace="api")),  # quotes is public
+    # Vite build assets
+    path(
+        "assets/<path:path>",
+        static_serve,
+        {"document_root": settings.BASE_DIR / "frontend" / "dist" / "assets"},
+        name="vite-assets",
+    ),
+    path(
+        "vite.svg",
+        static_serve,
+        {"document_root": settings.BASE_DIR / "frontend" / "dist", "path": "vite.svg"},
+        name="vite-svg",
+    ),
+    # SPA catch-all for authenticated users (middleware will redirect others to login)
+    re_path(r"^(?!assets/|vite\.svg$).*$", spa_index),
 ]
