@@ -34,10 +34,10 @@ export default function EuroOptionsPricing() {
 
     try {
       // [FIX] use API mount: /api/euro/  (works in dev via Vite proxy and in prod via reverse-proxy)
-      const res = await fetch(`/api/euro/?${params.toString()}`, {
-        headers: { "Accept": "application/json" },
-        credentials: "same-origin",
-      });
+     const res = await fetch(`/api/euro/price/?${params.toString()}`, {
+          headers: { "Accept": "application/json" },
+          credentials: "same-origin",
+        });
       const json = await res.json();
       if (!res.ok || (json as any).error) {
         setError((json as any).error || `HTTP ${res.status}`);
