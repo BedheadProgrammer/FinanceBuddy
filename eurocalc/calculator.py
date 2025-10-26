@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from calendar import Calendar
 from typing import Optional, Callable, List
 from datetime import date
 import math
@@ -136,7 +138,7 @@ class ImpliedVolatilityCalculator:
     def __init__(self, calendar=None, day_count=None):
         import QuantLib as ql  # imported here to avoid hard dependency for other flows
         self.ql = ql
-        self.calendar = calendar or ql.UnitedStates()
+        self.calendar = calendar or ql.UnitedStates(Calendar)
         self.day_count = day_count or ql.Actual365Fixed()
 
     def compute(
