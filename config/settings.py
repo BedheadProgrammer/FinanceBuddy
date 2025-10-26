@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     "corsheaders",
     "accounts",
+    'eurocalc',
     "optnstrdr",
 ]
 
