@@ -13,12 +13,7 @@ from .data_sources import MarketDataSource, CombinedDataSource
 # ---------------- Spot ----------------
 
 class SpotPriceCalculator:
-    """
-    Spot from:
-      1) injected ticker function (if provided),
-      2) else injected MarketDataSource,
-      3) else CombinedDataSource (AlphaVantage → TwelveData → yfinance).
-    """
+
     def __init__(
         self,
         market_ticker_func: Optional[Callable[[str], float]] = None,
