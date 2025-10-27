@@ -8,7 +8,7 @@ import requests
 
 
 class MarketDataSource:
-    """Interface for market data providers."""
+
     def get_spot(self, symbol: str) -> float: ...
     def get_daily_closes(self, symbol: str, need: int = 252) -> List[float]: ...
     def get_dividend_yield(self, symbol: str) -> Optional[float]: ...
@@ -17,8 +17,6 @@ class MarketDataSource:
 class AlphaVantageDataSource(MarketDataSource):
     """
     Alpha Vantage via official client.
-    Env: ALPHAVANTAGE_API_KEY (or ALPHA_VANTAGE_API_KEY)
-    Free tier ≈ 5 req/min; _sleep helps pace calls.
     """
 
     def __init__(self, api_key: Optional[str] = None, pause_s: float = 12.0):
@@ -96,7 +94,6 @@ class AlphaVantageDataSource(MarketDataSource):
 class TwelveDataDataSource(MarketDataSource):
     """
     TwelveData REST via requests.
-    Env: TWELVEDATA_API_KEY
     """
 
     BASE = "https://api.twelvedata.com"
