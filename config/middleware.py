@@ -16,6 +16,8 @@ class LoginRequiredMiddleware:
         self.allow_prefixes = tuple([
             "/accounts/",      # allauth (login, signup, etc.)
             "/api/prices",     # public quotes API
+            "/api/euro/",      # European options API
+            "/api/american/",  # American options API
             "/assets/",        # Vite built assets
             "/vite.svg",       # Vite icon
             static_url.rstrip("/"),
