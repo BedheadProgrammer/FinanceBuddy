@@ -20,12 +20,15 @@ urlpatterns = [
         {"document_root": settings.BASE_DIR / "frontend" / "dist" / "assets"},
         name="vite-assets",
     ),
+
     path(
         "vite.svg",
         static_serve,
         {"document_root": settings.BASE_DIR / "frontend" / "dist", "path": "vite.svg"},
         name="vite-svg",
     ),
+    path("api/euro/", include(("eurocalc.urls", "eurocalc"), namespace="eurocalc_api")),
+    path("api/american/", include(("eurocalc.urls_american", "eurocalc_american"), namespace="american_api")),
     # SPA catch-all for authenticated users (middleware will redirect others to login)
     re_path(r"^(?!assets/|vite\.svg$).*$", spa_index),
 ]

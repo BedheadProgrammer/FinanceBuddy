@@ -13,7 +13,6 @@
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
       <a href="/" class="font-bold">FinanceBuddy</a>
       <div class="flex items-center gap-3">
-        <a href="{% url 'optnstrdr:home' %}" class="px-3 py-1.5 rounded-lg bg-blue-500 text-white">Market</a>
         {% if user.is_authenticated %}
           <a href="{% url 'accounts:dashboard' %}" class="px-3 py-1.5 rounded-lg bg-white/10">Dashboard</a>
           <span class="text-sm opacity-80">Hi, {{ user.username }}</span>
