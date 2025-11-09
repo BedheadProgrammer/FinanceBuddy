@@ -13,10 +13,9 @@ export function NavBar() {
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button color="inherit" component={RouterLink} to="/">Home</Button>
           <Button color="inherit" component={RouterLink} to="/dashboard">Dashboard</Button>
-          <Button color="inherit" component={RouterLink} to="/tools/euro">Calculator</Button>
-          <Button color="inherit" component={RouterLink} to="/saved">Saved</Button>
-          <Button color="inherit" component={RouterLink} to="/assistant">AI Assistant</Button>
-          <Button color="inherit" component={RouterLink} to="/settings">Settings</Button>
+          <Button color="inherit" component={RouterLink} to="/tools/euro">European Option Calculator</Button>
+          {/* [ADDED] separate route for American option page */}
+          <Button color="inherit" component={RouterLink} to="/tools/american">American Option Calculator</Button>
           {isAuthenticated ? (
             <Button color="inherit" onClick={logout}>Logout</Button>
           ) : (
@@ -30,5 +29,3 @@ export function NavBar() {
     </AppBar>
   )
 }
-
-
