@@ -13,7 +13,7 @@ export function NavBar() {
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button color="inherit" component={RouterLink} to="/">Home</Button>
           <Button color="inherit" component={RouterLink} to="/dashboard">Dashboard</Button>
-          <Button color="inherit" component={RouterLink} to="/calculator">Calculator</Button>
+          <Button color="inherit" component={RouterLink} to="/tools/euro">Calculator</Button>
           <Button color="inherit" component={RouterLink} to="/saved">Saved</Button>
           <Button color="inherit" component={RouterLink} to="/assistant">AI Assistant</Button>
           <Button color="inherit" component={RouterLink} to="/settings">Settings</Button>

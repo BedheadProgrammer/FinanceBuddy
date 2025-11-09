@@ -24,18 +24,14 @@ def _extract_price(obj) -> Optional[float]:
 
 
     try:
-        # If the response is a dictionary, try the usual price-like fields.
         if isinstance(obj, dict):
             for k in ("price", "last", "close"):
                 if k in obj and obj[k] not in (None, ""):
                     return float(str(obj[k]).replace(",", ""))
-            # If it's a dict but none of those keys exist, we report no price found.
             return None
-        # If the response is a list, check the first element as a fallback.
         if isinstance(obj, list) and obj:
             return _extract_price(obj[0])
     except Exception:
-        # If something unexpected happens during parsing, say we couldn't extract a price.
         pass
     return None
 
@@ -50,14 +46,10 @@ def get_current_price(symbol: str) -> Tuple[Optional[float], Optional[str]]:
         if price is not None:
             return price, None
     except Exception as e:
-        # If the request fails (network issue, rate limit, etc.), remember the error
-        # and move on to the /quote fallback.
         last_err = f"price endpoint error: {e}"
     else:
-        # If there was no exception but no price was found, we still try the fallback.
         last_err = None
 
-        # If /price didn't work, ask for a full quote and try to read the price from there.
     try:
         q = td.quote(symbol=sym).as_json()
         price = _extract_price(q)
@@ -66,7 +58,6 @@ def get_current_price(symbol: str) -> Tuple[Optional[float], Optional[str]]:
         return None, f"Could not parse price from quote payload for {sym}."
     except Exception as e:
         # If both endpoints fail, return the combined error text so the caller
-        # can show a clear message to the user.
         if last_err:
             return None, f"{last_err}; quote endpoint error: {e}"
         return None, f"quote endpoint error: {e}"
@@ -83,8 +74,6 @@ def get_current_prices(tickers: Iterable[str]) -> dict:
             'MSFT': {'price': None, 'error': '...'}
           }
 
-    Why this exists:
-      - Makes it easy to fetch multiple stocks in one call (handy for a dashboard).
     """
     out = {}
     for t in tickers:
@@ -111,7 +100,6 @@ def _prompt_user_selection() -> list[str]:
         raw = input("Enter symbols (e.g., AAPL,MSFT,BRK.B): ").strip()
         return [s.strip().upper() for s in raw.split(",") if s.strip()]
 
-    # Support picking several items like "1,3,5".
     try:
         if "," in choice:
             idxs = []
@@ -120,26 +108,16 @@ def _prompt_user_selection() -> list[str]:
                 if 1 <= idx <= len(POPULAR):
                     idxs.append(idx)
             return [POPULAR[i - 1] for i in idxs] or [POPULAR[0]]
-        # Or a single number like "2".
         idx = int(choice)
         if 1 <= idx <= len(POPULAR):
             return [POPULAR[idx - 1]]
     except ValueError:
-        # If the input isn't a number, fall back to a sensible default.
         pass
 
-    # If nothing valid was chosen, return the first popular ticker so we show something.
     return [POPULAR[0]]
 
 def _print_results(results: dict) -> None:
-    """
-    Print a small, clean table of results to the console.
 
-    What this shows:
-      - One line per symbol.
-      - The current price if we have it.
-      - A short error note if we don't.
-    """
     print("\nCurrent Listing Prices")
     print("-" * 28)
     for sym, data in sorted(results.items()):
@@ -164,7 +142,6 @@ def main(argv: list[str]) -> int:
 
     This makes it easy to test the backend behavior before wiring it into a web route.
     """
-    # If tickers come from the command line, use them; else ask the user interactively.
     if len(argv) > 1:
         tickers = [a.upper() for a in argv[1:]]
     else:
@@ -177,7 +154,7 @@ def main(argv: list[str]) -> int:
     try:
         results = get_current_prices(tickers)
     except RuntimeError as e:
-        # This usually means the API key is missing.
+
         print(str(e))
         return 2
 
@@ -187,5 +164,5 @@ def main(argv: list[str]) -> int:
     return 0 if ok else 3
 
 if __name__ == "__main__":
-    # Run the main function and exit with its return code.
+
     raise SystemExit(main(sys.argv))

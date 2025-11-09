@@ -10,7 +10,6 @@ from django.db import models
 #OpenAIAPIResponse stores the OpenAI API responses
 
 
-# Create your models here.
 class UserAccounts(models.Model):
     Username = models.CharField(primary_key=True, max_length=150)
     HashedPassword = models.CharField(max_length=255)
