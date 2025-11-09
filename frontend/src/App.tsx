@@ -10,6 +10,7 @@ import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { Saved } from './pages/Saved'
+import AmericanOptionsPricing from "./pages/AmericanOptionsPricing";
 import { Settings } from './pages/Settings'
 import EuroOptionsPricing from "./pages/EuroOptionsPricing";  // [ADDED]
 // Temporary: disable auth guard so pages are directly reachable
@@ -24,6 +25,7 @@ function App() {
       <Container sx={{ py: 4 }}>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/tools/american" element={<AmericanOptionsPricing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
