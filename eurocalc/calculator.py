@@ -523,4 +523,5 @@ class VariablesAssembler:
             "symbol": symbol,
             "as_of": as_of_eff,
             "expiry": expiry,
-        }
+
+       }

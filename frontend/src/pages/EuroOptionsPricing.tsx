@@ -1,104 +1,283 @@
-import React, { useMemo, useState } from "react";
+// Page: European option pricer with Tailwind layout and chart navigation.
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-type PriceGreeks = { fair_value: number; delta: number; gamma: number; theta: number; vega: number; rho: number; };
-type Inputs = {
-  S: number; K: number; r: number; q: number; sigma: number; T: number;
-  d1: number; d2: number; side: "CALL"|"PUT"; symbol: string; as_of: string; expiry: string;
+type EuroApiResponse = {
+  inputs: {
+    symbol: string;
+    side: "CALL" | "PUT";
+    S: number;
+    K: number;
+    r: number;
+    q?: number;
+    sigma: number;
+    T: number;
+    as_of: string;
+    expiry: string;
+  };
+  price_and_greeks: {
+    fair_value: number;
+    delta: number;
+    gamma: number;
+    theta: number;
+    vega: number;
+    rho: number;
+  };
+  error?: string;
 };
-type ApiResponse = { inputs: Inputs; price_and_greeks: PriceGreeks } | { error: string };
 
 export default function EuroOptionsPricing() {
-  const todayISO = useMemo(() => new Date().toISOString().slice(0,10), []);
   const [symbol, setSymbol] = useState("AAPL");
-  const [side, setSide] = useState<"CALL"|"PUT">("CALL");
+  const [side, setSide] = useState<"CALL" | "PUT">("CALL");
   const [strike, setStrike] = useState("200");
   const [expiry, setExpiry] = useState("2026-01-17");
-  const [volMode, setVolMode] = useState<"HIST"|"IV">("HIST");
+  const [volMode, setVolMode] = useState<"HIST" | "IV">("HIST");
   const [marketOptionPrice, setMarketOptionPrice] = useState("");
   const [constantVol, setConstantVol] = useState("");
   const [useQL, setUseQL] = useState(false);
+  const [data, setData] = useState<EuroApiResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>();
-  const [data, setData] = useState<ApiResponse>();
+  const navigate = useNavigate();
 
-  async function submit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(undefined); setData(undefined); setLoading(true);
+    setError(null);
+    setLoading(true);
 
     const params = new URLSearchParams({
-      symbol: symbol.trim().toUpperCase(), side, strike: strike.trim(), expiry, vol_mode: volMode
+      symbol: symbol.trim().toUpperCase(),
+      side,
+      strike: strike.trim(),
+      expiry,
+      vol_mode: volMode,
     });
-    if (volMode === "IV" && marketOptionPrice.trim()) params.set("market_option_price", marketOptionPrice.trim());
+    if (volMode === "IV" && marketOptionPrice.trim()) {
+      params.set("market_option_price", marketOptionPrice.trim());
+    }
+    if (constantVol.trim()) {
+      params.set("constant_vol", constantVol.trim());
+    }
+    if (useQL) {
+      params.set("use_quantlib_daycount", "true");
+    }
+
+    const res = await fetch(`/api/euro/price/?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    });
+    const json = (await res.json()) as EuroApiResponse;
+    setLoading(false);
+
+    if (!res.ok || json.error) {
+      setError(json.error || "Request failed.");
+      setData(null);
+      return;
+    }
+
+    setData(json);
+  };
+
+  const handleViewChart = () => {
+    if (!data) return;
+
+    const params = new URLSearchParams({
+      symbol: symbol.trim().toUpperCase(),
+      side,
+      strike: strike.trim(),
+      expiry,
+      vol_mode: volMode,
+    });
+    if (marketOptionPrice.trim()) params.set("market_option_price", marketOptionPrice.trim());
     if (constantVol.trim()) params.set("constant_vol", constantVol.trim());
     if (useQL) params.set("use_quantlib_daycount", "true");
 
-    try {
-      // [FIX] use API mount: /api/euro/  (works in dev via Vite proxy and in prod via reverse-proxy)
-     const res = await fetch(`/api/euro/price/?${params.toString()}`, {
-          headers: { "Accept": "application/json" },
-          credentials: "same-origin",
-        });
-      const json = await res.json();
-      if (!res.ok || (json as any).error) {
-        setError((json as any).error || `HTTP ${res.status}`);
-      } else {
-        setData(json as ApiResponse);
-      }
-    } catch (err: any) {
-      setError(err?.message || String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const validIV = volMode === "IV" ? marketOptionPrice.trim().length > 0 : true;
+    navigate(`/tools/euro/greeks?${params.toString()}`, {
+      state: { response: data },
+    });
+  };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">European Option — Price &amp; Greeks</h1>
-      <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-        <div><label className="block font-medium">Symbol</label>
-          <input className="border p-2 w-full" value={symbol} onChange={e=>setSymbol(e.target.value)} /></div>
-        <div><label className="block font-medium">Side</label>
-          <select className="border p-2 w-full" value={side} onChange={e=>setSide(e.target.value as any)}>
-            <option value="CALL">CALL</option><option value="PUT">PUT</option></select></div>
-        <div><label className="block font-medium">Strike</label>
-          <input className="border p-2 w-full" inputMode="decimal" value={strike} onChange={e=>setStrike(e.target.value)} /></div>
-        <div><label className="block font-medium">Expiry</label>
-          <input className="border p-2 w-full" type="date" value={expiry} min={todayISO} onChange={e=>setExpiry(e.target.value)} /></div>
-        <div><label className="block font-medium">Volatility mode</label>
-          <select className="border p-2 w-full" value={volMode} onChange={e=>setVolMode(e.target.value as any)}>
-            <option value="HIST">Historical volatility</option><option value="IV">Implied volatility</option></select></div>
-        {volMode === "IV" && (
-          <div><label className="block font-medium">Market option price</label>
-            <input className="border p-2 w-full" inputMode="decimal" value={marketOptionPrice} onChange={e=>setMarketOptionPrice(e.target.value)} />
-            <p className="text-sm text-gray-600 mt-1">Required for IV solve.</p></div>
-        )}
-        <div><label className="block font-medium">Constant σ (optional)</label>
-          <input className="border p-2 w-full" placeholder="e.g. 0.25" inputMode="decimal" value={constantVol} onChange={e=>setConstantVol(e.target.value)} /></div>
-        <div className="flex items-center gap-2 mt-6"><input id="useQL" type="checkbox" checked={useQL} onChange={e=>setUseQL(e.target.checked)} />
-          <label htmlFor="useQL">Use QuantLib day count</label></div>
-        <div className="md:col-span-2"><button disabled={loading || !validIV} className="px-4 py-2 bg-black text-white disabled:opacity-50" type="submit">
-          {loading ? "Computing…" : "Compute"}</button>
-          {!validIV && <span className="ml-3 text-red-600">Market option price required for IV.</span>}</div>
-      </form>
+    <div className="min-h-screen px-4 py-8 md:px-8 lg:px-12">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">European Options Pricer</h1>
+        <p className="text-sm text-white/60 mt-2 max-w-xl">
+          Calculate fair value and Greeks using your Django backend.
+        </p>
+      </header>
 
-      {error && <div className="mt-6 p-3 border border-red-300 bg-red-50 text-red-800">{error}</div>}
+      <div className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-2xl bg-white/5 border border-white/5 p-5 space-y-5"
+        >
+          <div>
+            <h2 className="text-base font-semibold mb-1">Inputs</h2>
+            <p className="text-xs text-white/45">
+              Symbol, option type, strike, expiry, and how to source volatility.
+            </p>
+          </div>
 
-      {data && (data as any).price_and_greeks && (
-        <div className="mt-8 grid gap-6 md:grid-cols-2">
-          <section><h2 className="font-semibold mb-2">Inputs</h2>
-            <table className="w-full text-sm"><tbody>
-              {Object.entries((data as any).inputs).map(([k,v]) => (
-                <tr key={k}><td className="py-1 pr-3 text-gray-600">{k}</td><td className="py-1 font-mono">{String(v)}</td></tr>
-              ))}</tbody></table></section>
-          <section><h2 className="font-semibold mb-2">Fair Value &amp; Greeks</h2>
-            <table className="w-full text-sm"><tbody>
-              {Object.entries((data as any).price_and_greeks).map(([k,v]) => (
-                <tr key={k}><td className="py-1 pr-3 text-gray-600">{k}</td><td className="py-1 font-mono">{Number(v as number).toFixed(6)}</td></tr>
-              ))}</tbody></table></section>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm">
+              Symbol
+              <input
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/30"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              Option Type
+              <select
+                value={side}
+                onChange={(e) => setSide(e.target.value as "CALL" | "PUT")}
+                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="CALL">Call</option>
+                <option value="PUT">Put</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              Strike Price
+              <input
+                value={strike}
+                onChange={(e) => setStrike(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              Expiration Date
+              <input
+                type="date"
+                value={expiry}
+                onChange={(e) => setExpiry(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              Volatility Mode
+              <select
+                value={volMode}
+                onChange={(e) => setVolMode(e.target.value as "HIST" | "IV")}
+                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="HIST">Historical Volatility</option>
+                <option value="IV">Implied Volatility (needs market price)</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              Constant σ (optional)
+              <input
+                value={constantVol}
+                onChange={(e) => setConstantVol(e.target.value)}
+                placeholder="e.g. 0.25"
+                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+
+          {volMode === "IV" && (
+            <label className="flex flex-col gap-1 text-sm">
+              Market Option Price
+              <input
+                value={marketOptionPrice}
+                onChange={(e) => setMarketOptionPrice(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
+              />
+            </label>
+          )}
+
+          <label className="flex items-center gap-2 text-sm text-white/70">
+            <input
+              type="checkbox"
+              checked={useQL}
+              onChange={(e) => setUseQL(e.target.checked)}
+              className="accent-white"
+            />
+            Use QuantLib day count convention
+          </label>
+
+          {error && (
+            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <button
+            disabled={loading}
+            type="submit"
+            className="inline-flex items-center justify-center rounded-lg bg-white text-black px-4 py-2 text-sm font-semibold disabled:opacity-60"
+          >
+            {loading ? "Calculating…" : "Calculate Option Price & Greeks"}
+          </button>
+        </form>
+
+        <div className="rounded-2xl bg-white/5 border border-white/5 p-5">
+          <h2 className="text-base font-semibold mb-4">Result</h2>
+          {!data ? (
+            <p className="text-sm text-white/50">Run the calculator to see fair value and Greeks.</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/40 mb-1">Fair value</p>
+                  <p className="text-3xl font-bold">
+                    ${data.price_and_greeks.fair_value.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-white/40 mt-1">
+                    {data.inputs.side} on {data.inputs.symbol} @ {data.inputs.K}
+                  </p>
+                </div>
+                <button
+                  onClick={handleViewChart}
+                  className="text-xs px-3 py-1.5 rounded-full bg-black/30 border border-white/10 hover:bg-black/60"
+                >
+                  View Greeks chart
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
+                <div className="bg-black/30 rounded-lg p-3">
+                  <p className="text-white/40 text-xs">Delta</p>
+                  <p className="text-lg font-semibold">
+                    {data.price_and_greeks.delta.toFixed(4)}
+                  </p>
+                </div>
+                <div className="bg-black/30 rounded-lg p-3">
+                  <p className="text-white/40 text-xs">Gamma</p>
+                  <p className="text-lg font-semibold">
+                    {data.price_and_greeks.gamma.toFixed(6)}
+                  </p>
+                </div>
+                <div className="bg-black/30 rounded-lg p-3">
+                  <p className="text-white/40 text-xs">Theta</p>
+                  <p className="text-lg font-semibold">
+                    {data.price_and_greeks.theta.toFixed(4)}
+                  </p>
+                </div>
+                <div className="bg-black/30 rounded-lg p-3">
+                  <p className="text-white/40 text-xs">Vega</p>
+                  <p className="text-lg font-semibold">
+                    {data.price_and_greeks.vega.toFixed(4)}
+                  </p>
+                </div>
+                <div className="bg-black/30 rounded-lg p-3">
+                  <p className="text-white/40 text-xs">Rho</p>
+                  <p className="text-lg font-semibold">
+                    {data.price_and_greeks.rho.toFixed(4)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

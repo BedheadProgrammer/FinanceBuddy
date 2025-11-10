@@ -148,22 +148,33 @@ class TwelveDataDataSource(MarketDataSource):
             raise RuntimeError(f"TwelveData: insufficient closes for {symbol}")
         return closes[-need:]
 
-    @lru_cache(maxsize=256)
-    def get_dividend_yield(self, symbol: str) -> Optional[float]:
+
+@lru_cache(maxsize=256)
+def get_dividend_yield(self, symbol: str) -> Optional[float]:
+
+    try:
         f = self._get("/fundamentals", {"symbol": symbol}) or {}
-        for c in (
+    except requests.HTTPError:
+        # e.g. 404 /fundamentals or not in your plan
+        return None
+    except Exception:
+        # any other network/parse issue
+        return None
+
+    for c in (
             f.get("dividend_yield"),
             (f.get("summary") or {}).get("dividend_yield"),
             (f.get("valuation") or {}).get("dividend_yield"),
-        ):
-            if c is None:
-                continue
-            try:
-                return float(c)
-            except Exception:
-                pass
-        return None
+    ):
+        if c is None:
+            continue
+        try:
+            return float(c)
+        except Exception:
+            # sometimes it’s a non-numeric string
+            continue
 
+    return None
 
 class YFinanceDataSource(MarketDataSource):
     """yfinance fallback."""
