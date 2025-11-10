@@ -1,43 +1,29 @@
-import { Container } from '@mui/material'
-import type { ReactElement } from 'react'
-import { Route, Routes } from 'react-router-dom'
-import './App.css'
-import { Footer } from './components/Footer'
-import { NavBar } from './components/NavBar'
-import { Assistant } from './pages/Assistant'
-import { Dashboard } from './pages/Dashboard'
-import { Landing } from './pages/Landing'
-import { Login } from './pages/Login'
-import { Register } from './pages/Register'
-import { Saved } from './pages/Saved'
-import AmericanOptionsPricing from "./pages/AmericanOptionsPricing";
-import { Settings } from './pages/Settings'
-import EuroOptionsPricing from "./pages/EuroOptionsPricing";  // [ADDED]
-// Temporary: disable auth guard so pages are directly reachable
-function PrivateRoute({ element }: { element: ReactElement }) {
-  return element
-}
+import { Container } from "@mui/material";
+import type { ReactElement } from "react";
+import { Route, Routes } from "react-router-dom";
+import "./App.css";
+import { Footer } from "./components/Footer";
+import { NavBar } from "./components/NavBar";
+import { Assistant } from "./pages/Assistant";
+import { Dashboard } from "./pages/Dashboard";
+import EuroOptionsPricing from "./pages/EuroOptionsPricing";
+import GreeksVisualization from "./pages/GreeksVisualization";
 
-function App() {
+function App(): ReactElement {
   return (
     <>
       <NavBar />
-      <Container sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/tools/american" element={<AmericanOptionsPricing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
-          <Route path="/tools/euro" element={<EuroOptionsPricing />} />  // [ADDED] SPA route
-          <Route path="/saved" element={<PrivateRoute element={<Saved />} />} />
-          <Route path="/settings" element={<PrivateRoute element={<Settings />} />} />
-          <Route path="/assistant" element={<PrivateRoute element={<Assistant />} />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/assistant" element={<Assistant />} />
+          <Route path="/tools/euro" element={<EuroOptionsPricing />} />
+          <Route path="/tools/euro/greeks" element={<GreeksVisualization />} />
         </Routes>
       </Container>
       <Footer />
     </>
-  )
+  );
 }
 
-export default App
+export default App;
