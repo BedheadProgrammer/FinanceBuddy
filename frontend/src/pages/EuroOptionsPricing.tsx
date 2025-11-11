@@ -1,5 +1,21 @@
-// Page: European option pricer with Tailwind layout and chart navigation.
+// European option calculator page with a professional two-panel layout.
 import React, { useState } from "react";
+import {
+  Box,
+  Grid,
+  Paper,
+  Typography,
+  TextField,
+  ToggleButtonGroup,
+  ToggleButton,
+  MenuItem,
+  FormControlLabel,
+  Switch,
+  Button,
+  Divider,
+  Chip,
+  Stack,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 type EuroApiResponse = {
@@ -9,7 +25,7 @@ type EuroApiResponse = {
     S: number;
     K: number;
     r: number;
-    q?: number;
+    q: number;
     sigma: number;
     T: number;
     as_of: string;
@@ -27,6 +43,8 @@ type EuroApiResponse = {
 };
 
 export default function EuroOptionsPricing() {
+  const navigate = useNavigate();
+
   const [symbol, setSymbol] = useState("AAPL");
   const [side, setSide] = useState<"CALL" | "PUT">("CALL");
   const [strike, setStrike] = useState("200");
@@ -38,7 +56,6 @@ export default function EuroOptionsPricing() {
   const [data, setData] = useState<EuroApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +69,7 @@ export default function EuroOptionsPricing() {
       expiry,
       vol_mode: volMode,
     });
+
     if (volMode === "IV" && marketOptionPrice.trim()) {
       params.set("market_option_price", marketOptionPrice.trim());
     }
@@ -66,6 +84,7 @@ export default function EuroOptionsPricing() {
       headers: { Accept: "application/json" },
       credentials: "same-origin",
     });
+
     const json = (await res.json()) as EuroApiResponse;
     setLoading(false);
 
@@ -80,204 +99,291 @@ export default function EuroOptionsPricing() {
 
   const handleViewChart = () => {
     if (!data) return;
-
-    const params = new URLSearchParams({
-      symbol: symbol.trim().toUpperCase(),
-      side,
-      strike: strike.trim(),
-      expiry,
-      vol_mode: volMode,
-    });
-    if (marketOptionPrice.trim()) params.set("market_option_price", marketOptionPrice.trim());
-    if (constantVol.trim()) params.set("constant_vol", constantVol.trim());
-    if (useQL) params.set("use_quantlib_daycount", "true");
-
-    navigate(`/tools/euro/greeks?${params.toString()}`, {
+    navigate("/tools/euro/greeks", {
       state: { response: data },
     });
   };
 
   return (
-    <div className="min-h-screen px-4 py-8 md:px-8 lg:px-12">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">European Options Pricer</h1>
-        <p className="text-sm text-white/60 mt-2 max-w-xl">
-          Calculate fair value and Greeks using your Django backend.
-        </p>
-      </header>
+    <Box sx={{ minHeight: "calc(100vh - 120px)" }}>
+      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Box>
+          <Typography variant="h4" fontWeight={600}>
+            European Option Calculator
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Price a European option against your Django backend and view Greeks instantly.
+          </Typography>
+        </Box>
+        <Chip label="Live pricing" color="primary" variant="outlined" />
+      </Box>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-2xl bg-white/5 border border-white/5 p-5 space-y-5"
-        >
-          <div>
-            <h2 className="text-base font-semibold mb-1">Inputs</h2>
-            <p className="text-xs text-white/45">
-              Symbol, option type, strike, expiry, and how to source volatility.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm">
-              Symbol
-              <input
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/30"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              Option Type
-              <select
-                value={side}
-                onChange={(e) => setSide(e.target.value as "CALL" | "PUT")}
-                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="CALL">Call</option>
-                <option value="PUT">Put</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              Strike Price
-              <input
-                value={strike}
-                onChange={(e) => setStrike(e.target.value)}
-                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              Expiration Date
-              <input
-                type="date"
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              Volatility Mode
-              <select
-                value={volMode}
-                onChange={(e) => setVolMode(e.target.value as "HIST" | "IV")}
-                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="HIST">Historical Volatility</option>
-                <option value="IV">Implied Volatility (needs market price)</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm">
-              Constant σ (optional)
-              <input
-                value={constantVol}
-                onChange={(e) => setConstantVol(e.target.value)}
-                placeholder="e.g. 0.25"
-                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
-              />
-            </label>
-          </div>
-
-          {volMode === "IV" && (
-            <label className="flex flex-col gap-1 text-sm">
-              Market Option Price
-              <input
-                value={marketOptionPrice}
-                onChange={(e) => setMarketOptionPrice(e.target.value)}
-                className="bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm"
-              />
-            </label>
-          )}
-
-          <label className="flex items-center gap-2 text-sm text-white/70">
-            <input
-              type="checkbox"
-              checked={useQL}
-              onChange={(e) => setUseQL(e.target.checked)}
-              className="accent-white"
-            />
-            Use QuantLib day count convention
-          </label>
-
-          {error && (
-            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <button
-            disabled={loading}
-            type="submit"
-            className="inline-flex items-center justify-center rounded-lg bg-white text-black px-4 py-2 text-sm font-semibold disabled:opacity-60"
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={5}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              border: "1px solid rgba(255,255,255,0.05)",
+              background: "linear-gradient(160deg, #0f172a 0%, #020617 50%, #0f172a 100%)",
+            }}
           >
-            {loading ? "Calculating…" : "Calculate Option Price & Greeks"}
-          </button>
-        </form>
-
-        <div className="rounded-2xl bg-white/5 border border-white/5 p-5">
-          <h2 className="text-base font-semibold mb-4">Result</h2>
-          {!data ? (
-            <p className="text-sm text-white/50">Run the calculator to see fair value and Greeks.</p>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-white/40 mb-1">Fair value</p>
-                  <p className="text-3xl font-bold">
-                    ${data.price_and_greeks.fair_value.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-white/40 mt-1">
-                    {data.inputs.side} on {data.inputs.symbol} @ {data.inputs.K}
-                  </p>
-                </div>
-                <button
-                  onClick={handleViewChart}
-                  className="text-xs px-3 py-1.5 rounded-full bg-black/30 border border-white/10 hover:bg-black/60"
+            <Typography variant="subtitle1" sx={{ mb: 2 }}>
+              Option setup
+            </Typography>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2}>
+                <TextField
+                  label="Symbol"
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value)}
+                  size="small"
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                />
+                <Box>
+                  <Typography variant="caption" sx={{ mb: 0.5, display: "block" }}>
+                    Side
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={side}
+                    exclusive
+                    onChange={(_, v) => v && setSide(v)}
+                    size="small"
+                  >
+                    <ToggleButton value="CALL">CALL</ToggleButton>
+                    <ToggleButton value="PUT">PUT</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Strike"
+                      value={strike}
+                      onChange={(e) => setStrike(e.target.value)}
+                      size="small"
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Expiration"
+                      type="date"
+                      value={expiry}
+                      onChange={(e) => setExpiry(e.target.value)}
+                      size="small"
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                </Grid>
+                <TextField
+                  select
+                  label="Volatility source"
+                  value={volMode}
+                  onChange={(e) => setVolMode(e.target.value as "HIST" | "IV")}
+                  size="small"
+                  fullWidth
                 >
-                  View Greeks chart
-                </button>
-              </div>
+                  <MenuItem value="HIST">Historical volatility</MenuItem>
+                  <MenuItem value="IV">Implied volatility (needs market price)</MenuItem>
+                </TextField>
+                {volMode === "IV" && (
+                  <TextField
+                    label="Market option price"
+                    value={marketOptionPrice}
+                    onChange={(e) => setMarketOptionPrice(e.target.value)}
+                    size="small"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                )}
+                <TextField
+                  label="Constant σ override (optional)"
+                  value={constantVol}
+                  onChange={(e) => setConstantVol(e.target.value)}
+                  size="small"
+                  fullWidth
+                  placeholder="e.g. 0.22"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <FormControlLabel
+                  control={<Switch checked={useQL} onChange={(e) => setUseQL(e.target.checked)} />}
+                  label="Use QuantLib day count"
+                />
+                {error && (
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      bgcolor: "rgba(248, 113, 113, 0.1)",
+                      border: "1px solid rgba(248, 113, 113, 0.4)",
+                      borderRadius: 2,
+                      p: 1.2,
+                      color: "#fecaca",
+                    }}
+                  >
+                    {error}
+                  </Typography>
+                )}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="medium"
+                  disabled={loading}
+                  sx={{ borderRadius: 2, textTransform: "none" }}
+                  fullWidth
+                >
+                  {loading ? "Calculating…" : "Calculate price & greeks"}
+                </Button>
+              </Stack>
+            </Box>
+          </Paper>
+        </Grid>
 
-              <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-white/40 text-xs">Delta</p>
-                  <p className="text-lg font-semibold">
-                    {data.price_and_greeks.delta.toFixed(4)}
-                  </p>
-                </div>
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-white/40 text-xs">Gamma</p>
-                  <p className="text-lg font-semibold">
-                    {data.price_and_greeks.gamma.toFixed(6)}
-                  </p>
-                </div>
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-white/40 text-xs">Theta</p>
-                  <p className="text-lg font-semibold">
-                    {data.price_and_greeks.theta.toFixed(4)}
-                  </p>
-                </div>
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-white/40 text-xs">Vega</p>
-                  <p className="text-lg font-semibold">
-                    {data.price_and_greeks.vega.toFixed(4)}
-                  </p>
-                </div>
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-white/40 text-xs">Rho</p>
-                  <p className="text-lg font-semibold">
-                    {data.price_and_greeks.rho.toFixed(4)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+        <Grid item xs={12} md={7}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              border: "1px solid rgba(255,255,255,0.03)",
+              backgroundColor: "rgba(2,6,23,0.3)",
+            }}
+          >
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Box>
+                <Typography variant="subtitle1">Latest result</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Shows the last successful calculation from the backend.
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleViewChart}
+                disabled={!data}
+                sx={{ borderRadius: 999, textTransform: "none" }}
+              >
+                View Greeks chart
+              </Button>
+            </Box>
+
+            <Divider sx={{ my: 2 }} />
+
+            {!data ? (
+              <Box sx={{ py: 4, textAlign: "center" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Run a calculation to see price and Greeks.
+                </Typography>
+              </Box>
+            ) : (
+              <Box>
+                <Box
+                  sx={{
+                    mb: 3,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Fair value
+                    </Typography>
+                    <Typography variant="h3" fontWeight={600} sx={{ mt: 0.5 }}>
+                      ${data.price_and_greeks.fair_value.toFixed(2)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                      {data.inputs.side} on {data.inputs.symbol} @ {data.inputs.K}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: "right" }}>
+                    <Typography variant="caption" color="text.secondary">
+                      As of
+                    </Typography>
+                    <Typography variant="body2">
+                      {new Date(data.inputs.as_of).toLocaleDateString()}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Exp: {new Date(data.inputs.expiry).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Grid container spacing={1.5}>
+                  <Grid item xs={6} sm={4}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Delta
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                        {data.price_and_greeks.delta.toFixed(4)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={6} sm={4}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Gamma
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                        {data.price_and_greeks.gamma.toFixed(6)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={6} sm={4}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Theta
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                        {data.price_and_greeks.theta.toFixed(4)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={6} sm={4}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Vega
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                        {data.price_and_greeks.vega.toFixed(4)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={6} sm={4}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Rho
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                        {data.price_and_greeks.rho.toFixed(4)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+    </Box>
   );
 }
