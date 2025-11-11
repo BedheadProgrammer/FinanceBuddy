@@ -8,6 +8,7 @@ import { Assistant } from "./pages/Assistant";
 import { Dashboard } from "./pages/Dashboard";
 import EuroOptionsPricing from "./pages/EuroOptionsPricing";
 import GreeksVisualization from "./pages/GreeksVisualization";
+import AmericanOptionsPricing from "./pages/AmericanOptionsPricing"
 
 function App(): ReactElement {
   return (
@@ -17,6 +18,7 @@ function App(): ReactElement {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/assistant" element={<Assistant />} />
+          <Route path="/tools/american" element={<AmericanOptionsPricing />} />
           <Route path="/tools/euro" element={<EuroOptionsPricing />} />
           <Route path="/tools/euro/greeks" element={<GreeksVisualization />} />
         </Routes>
