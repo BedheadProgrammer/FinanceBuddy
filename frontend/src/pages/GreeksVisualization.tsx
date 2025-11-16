@@ -10,6 +10,7 @@ import {
   Stack,
 } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 type Inputs = {
   symbol: string;
@@ -34,6 +35,10 @@ type Greeks = {
 };
 
 export default function GreeksVisualization() {
+  usePageMeta(
+    "Greeks Visualization | FinanceBuddy",
+    "Visual reference for the Greeks of the option you just priced, including delta, gamma, theta, vega, and rho."
+  );
   const location = useLocation();
   const navigate = useNavigate();
   const [inputs, setInputs] = useState<Inputs | null>(null);
@@ -85,7 +90,9 @@ export default function GreeksVisualization() {
 
   return (
     <Box sx={{ minHeight: "calc(100vh - 120px)" }}>
-      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Box
+        sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+      >
         <Box>
           <Typography variant="h4" fontWeight={600}>
             Greeks breakdown
@@ -110,7 +117,8 @@ export default function GreeksVisualization() {
           sx={{ p: 4, borderRadius: 3, textAlign: "center", backgroundColor: "rgba(2,6,23,0.3)" }}
         >
           <Typography variant="body1" color="text.secondary">
-            No option data received. Run the European calculator first, then click “View Greeks chart.”
+            No option data received. Run the European calculator first, then click “View Greeks
+            chart.”
           </Typography>
         </Paper>
       ) : (
@@ -138,7 +146,11 @@ export default function GreeksVisualization() {
               <Typography variant="h4" sx={{ mt: 0.5 }}>
                 ${greeks.fair_value.toFixed(2)}
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 1, display: "block" }}
+              >
                 As of {new Date(inputs.as_of).toLocaleDateString()}
               </Typography>
             </Paper>
@@ -154,19 +166,39 @@ export default function GreeksVisualization() {
               </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6} md={4}>
-                  <MetricCard title="Delta" value={greeks.delta.toFixed(4)} helper="Price change vs underlying" />
+                  <MetricCard
+                    title="Delta"
+                    value={greeks.delta.toFixed(4)}
+                    helper="Price change vs underlying"
+                  />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <MetricCard title="Gamma" value={greeks.gamma.toFixed(6)} helper="Delta sensitivity" />
+                  <MetricCard
+                    title="Gamma"
+                    value={greeks.gamma.toFixed(6)}
+                    helper="Delta sensitivity"
+                  />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <MetricCard title="Theta" value={greeks.theta.toFixed(4)} helper="Time decay (per year)" />
+                  <MetricCard
+                    title="Theta"
+                    value={greeks.theta.toFixed(4)}
+                    helper="Time decay (per year)"
+                  />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <MetricCard title="Vega" value={greeks.vega.toFixed(4)} helper="Volatility sensitivity" />
+                  <MetricCard
+                    title="Vega"
+                    value={greeks.vega.toFixed(4)}
+                    helper="Volatility sensitivity"
+                  />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <MetricCard title="Rho" value={greeks.rho.toFixed(4)} helper="Rate sensitivity" />
+                  <MetricCard
+                    title="Rho"
+                    value={greeks.rho.toFixed(4)}
+                    helper="Rate sensitivity"
+                  />
                 </Grid>
               </Grid>
 

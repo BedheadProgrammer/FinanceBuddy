@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 type PricesResponse = Record<
   string,
@@ -24,6 +25,11 @@ export function Dashboard() {
   const [data, setData] = useState<PricesResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
+
+  usePageMeta(
+    'Dashboard | FinanceBuddy',
+    'Quickly check live market prices and access FinanceBuddy tools for options pricing and analysis.'
+  );
 
   const fetchPrices = async (s: string) => {
     const qs = s.trim();

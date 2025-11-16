@@ -1,6 +1,7 @@
+// frontend/src/App.tsx
 import { Container } from "@mui/material";
 import type { ReactElement } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import { Footer } from "./components/Footer";
 import { NavBar } from "./components/NavBar";
@@ -8,7 +9,25 @@ import { Assistant } from "./pages/Assistant";
 import { Dashboard } from "./pages/Dashboard";
 import EuroOptionsPricing from "./pages/EuroOptionsPricing";
 import GreeksVisualization from "./pages/GreeksVisualization";
-import AmericanOptionsPricing from "./pages/AmericanOptionsPricing"
+import AmericanOptionsPricing from "./pages/AmericanOptionsPricing";
+import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
+import { Landing } from "./pages/Landing";
+import { useAuth } from "./store/auth";
+
+type ProtectedRouteProps = {
+  children: ReactElement;
+};
+
+function ProtectedRoute({ children }: ProtectedRouteProps): ReactElement {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
 
 function App(): ReactElement {
   return (
@@ -16,11 +35,55 @@ function App(): ReactElement {
       <NavBar />
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/assistant" element={<Assistant />} />
-          <Route path="/tools/american" element={<AmericanOptionsPricing />} />
-          <Route path="/tools/euro" element={<EuroOptionsPricing />} />
-          <Route path="/tools/euro/greeks" element={<GreeksVisualization />} />
+
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assistant"
+            element={
+              <ProtectedRoute>
+                <Assistant />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/american"
+            element={
+              <ProtectedRoute>
+                <AmericanOptionsPricing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/euro"
+            element={
+              <ProtectedRoute>
+                <EuroOptionsPricing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tools/euro/greeks"
+            element={
+              <ProtectedRoute>
+                <GreeksVisualization />
+              </ProtectedRoute>
+            }
+          />
+
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>
       <Footer />

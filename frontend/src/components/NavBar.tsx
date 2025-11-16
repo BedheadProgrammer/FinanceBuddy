@@ -1,36 +1,56 @@
+// frontend/src/components/NavBar.tsx
 import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../store/auth";
 
 export function NavBar() {
   const { isAuthenticated, logout } = useAuth();
+  const homeTarget = isAuthenticated ? "/dashboard" : "/";
+
   return (
-    <AppBar position="static" color="transparent" sx={{ boxShadow: "none", backgroundImage: "none" }}>
+    <AppBar
+      position="static"
+      color="transparent"
+      sx={{ boxShadow: "none", backgroundImage: "none" }}
+    >
       <Toolbar>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           FinanceBuddy
         </Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
-          <Button color="inherit" component={RouterLink} to="/">
+          <Button color="inherit" component={RouterLink} to={homeTarget}>
             Home
           </Button>
-          <Button color="inherit" component={RouterLink} to="/dashboard">
-            Dashboard
-          </Button>
-          <Button color="inherit" component={RouterLink} to="/tools/euro">
-            European Option Calculator
-          </Button>
-          <Button color="inherit" component={RouterLink} to="/tools/euro/greeks">
-            Greeks
-          </Button>
-          <Button color="inherit" component={RouterLink} to="/tools/american">
-            American Option Calculator
-          </Button>
-          {isAuthenticated ? (
-            <Button color="inherit" onClick={logout}>
-              Logout
-            </Button>
-          ) : (
+
+          {isAuthenticated && (
+            <>
+              <Button color="inherit" component={RouterLink} to="/dashboard">
+                Dashboard
+              </Button>
+              <Button color="inherit" component={RouterLink} to="/tools/euro">
+                European Option Calculator
+              </Button>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/tools/euro/greeks"
+              >
+                Greeks
+              </Button>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/tools/american"
+              >
+                American Option Calculator
+              </Button>
+              <Button color="inherit" onClick={logout}>
+                Logout
+              </Button>
+            </>
+          )}
+
+          {!isAuthenticated && (
             <>
               <Button color="inherit" component={RouterLink} to="/login">
                 Login

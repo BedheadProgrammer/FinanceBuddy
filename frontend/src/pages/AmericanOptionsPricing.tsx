@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 type Inputs = {
   S: number; K: number; r: number; q: number; sigma: number; T: number;
@@ -22,6 +23,11 @@ export default function AmericanOptionsPricing() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [data, setData] = useState<AmericanApiResponse>();
+
+  usePageMeta(
+    "American Option Pricing | FinanceBuddy",
+    "Compute American option prices, compare to European prices, and see early exercise premium and critical price using FinanceBuddy."
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

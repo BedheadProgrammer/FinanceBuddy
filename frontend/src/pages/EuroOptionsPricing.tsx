@@ -17,6 +17,7 @@ import {
   Stack,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 type EuroApiResponse = {
   inputs: {
@@ -44,6 +45,11 @@ type EuroApiResponse = {
 
 export default function EuroOptionsPricing() {
   const navigate = useNavigate();
+
+  usePageMeta(
+    "European Option Calculator | FinanceBuddy",
+    "Price European call and put options against your Django backend and view Greeks instantly with FinanceBuddy."
+  );
 
   const [symbol, setSymbol] = useState("AAPL");
   const [side, setSide] = useState<"CALL" | "PUT">("CALL");
@@ -106,7 +112,9 @@ export default function EuroOptionsPricing() {
 
   return (
     <Box sx={{ minHeight: "calc(100vh - 120px)" }}>
-      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Box
+        sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+      >
         <Box>
           <Typography variant="h4" fontWeight={600}>
             European Option Calculator
@@ -252,7 +260,9 @@ export default function EuroOptionsPricing() {
               backgroundColor: "rgba(2,6,23,0.3)",
             }}
           >
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            >
               <Box>
                 <Typography variant="subtitle1">Latest result</Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -295,7 +305,11 @@ export default function EuroOptionsPricing() {
                     <Typography variant="h3" fontWeight={600} sx={{ mt: 0.5 }}>
                       ${data.price_and_greeks.fair_value.toFixed(2)}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ mt: 0.5, display: "block" }}
+                    >
                       {data.inputs.side} on {data.inputs.symbol} @ {data.inputs.K}
                     </Typography>
                   </Box>
@@ -321,7 +335,10 @@ export default function EuroOptionsPricing() {
                       <Typography variant="caption" color="text.secondary">
                         Delta
                       </Typography>
-                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                      <Typography
+                        variant="h6"
+                        sx={{ fontVariantNumeric: "tabular-nums" }}
+                      >
                         {data.price_and_greeks.delta.toFixed(4)}
                       </Typography>
                     </Paper>
@@ -334,7 +351,10 @@ export default function EuroOptionsPricing() {
                       <Typography variant="caption" color="text.secondary">
                         Gamma
                       </Typography>
-                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                      <Typography
+                        variant="h6"
+                        sx={{ fontVariantNumeric: "tabular-nums" }}
+                      >
                         {data.price_and_greeks.gamma.toFixed(6)}
                       </Typography>
                     </Paper>
@@ -347,7 +367,10 @@ export default function EuroOptionsPricing() {
                       <Typography variant="caption" color="text.secondary">
                         Theta
                       </Typography>
-                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                      <Typography
+                        variant="h6"
+                        sx={{ fontVariantNumeric: "tabular-nums" }}
+                      >
                         {data.price_and_greeks.theta.toFixed(4)}
                       </Typography>
                     </Paper>
@@ -360,7 +383,10 @@ export default function EuroOptionsPricing() {
                       <Typography variant="caption" color="text.secondary">
                         Vega
                       </Typography>
-                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                      <Typography
+                        variant="h6"
+                        sx={{ fontVariantNumeric: "tabular-nums" }}
+                      >
                         {data.price_and_greeks.vega.toFixed(4)}
                       </Typography>
                     </Paper>
@@ -373,7 +399,10 @@ export default function EuroOptionsPricing() {
                       <Typography variant="caption" color="text.secondary">
                         Rho
                       </Typography>
-                      <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                      <Typography
+                        variant="h6"
+                        sx={{ fontVariantNumeric: "tabular-nums" }}
+                      >
                         {data.price_and_greeks.rho.toFixed(4)}
                       </Typography>
                     </Paper>

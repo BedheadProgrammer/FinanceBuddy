@@ -4,6 +4,8 @@ from django.urls import path, re_path, include
 from django.views.static import serve as static_serve
 from django.conf import settings
 from django.http import FileResponse
+from django.urls import path, re_path, include
+
 
 def spa_index(_request, unused=None):
     index = settings.BASE_DIR / "frontend" / "dist" / "index.html"
@@ -13,6 +15,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
     path("api/", include(("api.urls", "api"), namespace="api")),  # quotes is public
+    path("api/auth/", include(("accounts.api_urls", "accounts_api"), namespace="accounts_api")),
     # Vite build assets
     path(
         "assets/<path:path>",
