@@ -33,13 +33,11 @@ function App(): ReactElement {
   return (
     <>
       <NavBar />
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth={false} disableGutters>
         <Routes>
-
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-
 
           <Route
             path="/dashboard"
@@ -81,8 +79,6 @@ function App(): ReactElement {
               </ProtectedRoute>
             }
           />
-
-
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>

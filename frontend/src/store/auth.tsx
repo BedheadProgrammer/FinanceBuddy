@@ -37,12 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
 
   const login = useCallback(async (username: string, password: string) => {
+    setIsAuthenticated(false)
     await postJson('/api/auth/login/', { username, password })
     setIsAuthenticated(true)
   }, [])
 
   const logout = useCallback(() => {
-
     setIsAuthenticated(false)
   }, [])
 
@@ -63,4 +63,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }
-
