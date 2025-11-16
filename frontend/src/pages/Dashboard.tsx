@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  Card,
   CircularProgress,
   Stack,
   TextField,
@@ -36,30 +37,30 @@ export function Dashboard() {
     setLoading(true);
     setErr(null);
     try {
-      const resp = await fetch(`/api/prices?symbols=${encodeURIComponent(qs)}`, {
+      const res = await fetch(`/api/prices?symbols=${encodeURIComponent(qs)}`, {
         credentials: 'include',
         headers: { Accept: 'application/json' },
       });
 
-      if (!resp.ok) {
-        if (resp.status === 401) {
+      if (!res.ok) {
+        if (res.status === 401) {
           setErr('Authentication required. Sign in and try again.');
           setData(null);
           return;
         }
-        setErr(`HTTP ${resp.status}`);
+        setErr(`HTTP ${res.status}`);
         setData(null);
         return;
       }
 
-      const ct = resp.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) {
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
         setErr('Unexpected response (not JSON).');
         setData(null);
         return;
       }
 
-      const json = (await resp.json()) as PricesResponse;
+      const json = (await res.json()) as PricesResponse;
       setData(json);
     } catch (e: any) {
       setErr(e?.message || 'Failed to fetch prices');
@@ -75,109 +76,275 @@ export function Dashboard() {
   }, []);
 
   return (
-    <Stack spacing={2}>
-      <Typography variant="h5">Dashboard</Typography>
+    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      <Box
+        sx={{
+          textAlign: 'center',
+          py: { xs: 4, md: 6 },
+          px: 2,
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            mb: 2,
+            lineHeight: 1.2,
+          }}
+        >
+          Your Financial Toolkit
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: { xs: '1.125rem', sm: '1.25rem' },
+            color: 'rgba(15, 23, 42, 0.7)',
+            maxWidth: 600,
+            mx: 'auto',
+            lineHeight: 1.6,
+          }}
+        >
+          Analyze options and track market data in real-time
+        </Typography>
+      </Box>
 
       <Box
         sx={{
           display: 'grid',
-          gap: 2,
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+          gap: 3,
+          alignItems: 'flex-start',
+          gridTemplateColumns: {
+            xs: '1fr',
+            lg: 'minmax(0, 2fr) minmax(0, 1.2fr)',
+          },
+          px: 2,
+          pb: 6,
         }}
       >
-        {/* Quick Calculator */}
-        <Stack spacing={1}>
-          <Typography variant="h6">Quick Calculator</Typography>
-          <Button component={RouterLink} to="/calculator" variant="contained">
-            Open
-          </Button>
-        </Stack>
-
-        {/* Recent Predictions */}
-        <Stack spacing={1}>
-          <Typography variant="h6">Recent Predictions</Typography>
-          <Button component={RouterLink} to="/saved" variant="contained">
-            View
-          </Button>
-        </Stack>
-
-        {/* Market Data */}
-        <Stack spacing={1}>
-          <Typography variant="h6">Market Data</Typography>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-            <TextField
-              fullWidth
-              label="Symbols (comma-separated)"
-              placeholder="AAPL,MSFT,BRK.B"
-              value={symbols}
-              onChange={(e) => setSymbols(e.target.value)}
-              size="small"
-            />
-            <Button
-              variant="contained"
-              onClick={() => fetchPrices(symbols)}
-              disabled={loading || !symbols.trim()}
-            >
-              {loading ? 'Fetching…' : 'Fetch prices'}
-            </Button>
-          </Stack>
-
-          {err && <Alert severity="error">{err}</Alert>}
-
-          <Box
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Card
             sx={{
-              position: 'relative',
-              minHeight: 80,
-              border: (t) => `1px solid ${t.palette.divider}`,
-              borderRadius: 1,
-              p: 1.5,
+              p: 4,
+              borderRadius: 3,
+              border: '1px solid rgba(15, 23, 42, 0.06)',
+              boxShadow: '0 10px 30px rgba(15, 23, 42, 0.16)',
+              backgroundColor: 'rgba(255, 255, 255, 0.96)',
+              transition: 'box-shadow 0.25s ease, transform 0.25s ease',
+              '&:hover': {
+                boxShadow: '0 18px 45px rgba(15, 23, 42, 0.22)',
+                transform: 'translateY(-2px)',
+              },
             }}
           >
-            {loading && (
-              <Stack
-                alignItems="center"
-                justifyContent="center"
-                sx={{ position: 'absolute', inset: 0 }}
+            <Typography
+              sx={{
+                fontSize: '1.25rem',
+                fontWeight: 600,
+                color: 'rgba(15, 23, 42, 0.95)',
+                mb: 3,
+              }}
+            >
+              Live market prices
+            </Typography>
+
+            <Stack spacing={2}>
+             <TextField
+  fullWidth
+  label="Stock symbols"
+  placeholder="AAPL, MSFT, GOOGL"
+  value={symbols}
+  onChange={(e) => setSymbols(e.target.value)}
+  sx={{
+    '& .MuiOutlinedInput-root': {
+      backgroundColor: '#ffffff',
+      color: 'rgba(15, 23, 42, 0.95)',
+      '& fieldset': {
+        borderColor: 'rgba(15, 23, 42, 0.15)',
+      },
+      '&:hover fieldset': {
+        borderColor: 'rgba(15, 23, 42, 0.3)',
+      },
+    },
+  }}
+/>
+
+              <Button
+                onClick={() => fetchPrices(symbols)}
+                disabled={loading || !symbols.trim()}
+                sx={{
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                  color: '#ffffff',
+                  '&:hover': {
+                    backgroundColor: 'rgba(15, 23, 42, 1)',
+                  },
+                  '&:disabled': {
+                    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+                  },
+                }}
               >
-                <CircularProgress size={24} />
-              </Stack>
-            )}
+                {loading ? 'Loading...' : 'Get prices'}
+              </Button>
 
-            {!loading && data && Object.keys(data).length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                No results.
-              </Typography>
-            )}
+              {err && <Alert severity="error">{err}</Alert>}
 
-            {!loading && data && Object.keys(data).length > 0 && (
-              <Stack component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }} spacing={0.5}>
-                {Object.entries(data).map(([sym, { price, error }]) => (
-                  <li key={sym}>
-                    <Typography variant="body2">
-                      <strong>{sym}</strong>{' '}
-                      {price !== null ? (
-                        <span>
-                          $
-                          {price.toLocaleString(undefined, {
-                            maximumFractionDigits: 4,
-                          })}
-                        </span>
-                      ) : (
-                        <span style={{ opacity: 0.7 }}>— (error: {error})</span>
-                      )}
-                    </Typography>
-                  </li>
-                ))}
-              </Stack>
-            )}
-          </Box>
+              <Box
+                sx={{
+                  position: 'relative',
+                  minHeight: 120,
+                  backgroundColor: '#f8fafc',
+                  borderRadius: 2,
+                  p: 3,
+                }}
+              >
+                {loading && (
+                  <Stack
+                    alignItems="center"
+                    justifyContent="center"
+                    sx={{ position: 'absolute', inset: 0 }}
+                  >
+                    <CircularProgress size={32} />
+                  </Stack>
+                )}
 
-          <Typography variant="caption" color="text.secondary">
-            Uses the Django endpoint at <code>/api/prices?symbols=&lt;list&gt;</code>.
-          </Typography>
-        </Stack>
+                {!loading && !data && !err && (
+                  <Typography sx={{ color: 'rgba(15, 23, 42, 0.5)' }}>
+                    Enter symbols above to see live prices
+                  </Typography>
+                )}
+
+                {!loading && data && Object.keys(data).length === 0 && (
+                  <Typography sx={{ color: 'rgba(15, 23, 42, 0.5)' }}>
+                    No results found
+                  </Typography>
+                )}
+
+                {!loading && data && Object.keys(data).length > 0 && (
+                  <Stack spacing={2}>
+                    {Object.entries(data).map(([sym, { price, error }]) => (
+                      <Box
+                        key={sym}
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          p: 2,
+                          backgroundColor: '#ffffff',
+                          borderRadius: 1.5,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            color: 'rgba(15, 23, 42, 0.95)',
+                          }}
+                        >
+                          {sym}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: '1.125rem',
+                            fontWeight: 600,
+                            color:
+                              price !== null
+                                ? 'rgba(16, 185, 129, 0.95)'
+                                : 'rgba(239, 68, 68, 0.9)',
+                          }}
+                        >
+                          {price !== null
+                            ? `$${price.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`
+                            : error || 'n/a'}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            </Stack>
+          </Card>
+        </Box>
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Card
+            component={RouterLink}
+            to="/calculator"
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              border: '1px solid rgba(15, 23, 42, 0.06)',
+              boxShadow: '0 10px 30px rgba(15, 23, 42, 0.16)',
+              backgroundColor: 'rgba(255, 255, 255, 0.96)',
+              textDecoration: 'none',
+              transition: 'box-shadow 0.25s ease, transform 0.25s ease',
+              '&:hover': {
+                boxShadow: '0 18px 45px rgba(15, 23, 42, 0.22)',
+                transform: 'translateY(-2px)',
+              },
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: 'rgba(15, 23, 42, 0.95)',
+                mb: 1,
+              }}
+            >
+              Options calculator
+            </Typography>
+            <Typography
+              sx={{ color: 'rgba(15, 23, 42, 0.6)', fontSize: '0.9rem' }}
+            >
+              Price options using Black–Scholes and explore payoff profiles.
+            </Typography>
+          </Card>
+
+          <Card
+            component={RouterLink}
+            to="/saved"
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              border: '1px solid rgba(15, 23, 42, 0.06)',
+              boxShadow: '0 10px 30px rgba(15, 23, 42, 0.16)',
+              backgroundColor: 'rgba(255, 255, 255, 0.96)',
+              textDecoration: 'none',
+              transition: 'box-shadow 0.25s ease, transform 0.25s ease',
+              '&:hover': {
+                boxShadow: '0 18px 45px rgba(15, 23, 42, 0.22)',
+                transform: 'translateY(-2px)',
+              },
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: 'rgba(15, 23, 42, 0.95)',
+                mb: 1,
+              }}
+            >
+              Saved predictions
+            </Typography>
+            <Typography
+              sx={{ color: 'rgba(15, 23, 42, 0.6)', fontSize: '0.9rem' }}
+            >
+              Revisit previous scenarios and compare your assumptions over time.
+            </Typography>
+          </Card>
+        </Box>
       </Box>
-    </Stack>
+    </Box>
   );
 }
