@@ -21,75 +21,66 @@ export function NavBar() {
   const homeTarget = isAuthenticated ? "/dashboard" : "/";
 
   return (
-    <AppBar
-      position="static"
-      color="transparent"
-      sx={{ boxShadow: "none", backgroundImage: "none" }}
-    >
-      <Toolbar>
-        <Typography
+    <AppBar position="static" color="primary">
+      <Toolbar
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        {/* Brand / Logo */}
+        <Box
           component={RouterLink}
           to={homeTarget}
-          variant="h6"
           sx={{
-            flexGrow: 1,
-            display: "inline-flex",
+            textDecoration: "none",
+            color: "inherit",
+            display: "flex",
             alignItems: "center",
             gap: 1,
-            textDecoration: "none",
-            cursor: "pointer",
-            userSelect: "none",
-            fontWeight: 800,
-            letterSpacing: 0.2,
-            fontFamily:
-              'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
-            lineHeight: 1.1,
-            whiteSpace: "nowrap",
-            filter: "drop-shadow(0 0 2px rgba(124,77,255,0.15))",
-            transition:
-              "transform 250ms ease, filter 250ms ease, background-position 250ms ease",
-            willChange: "transform, filter, background-position",
-            "&:hover": {
-              transform: "translateY(-1px) scale(1.02)",
-              filter: "drop-shadow(0 0 10px rgba(124,77,255,0.45))",
-            },
-            "&:active": {
-              transform: "translateY(0) scale(0.99)",
-            },
-            "&:hover .brandGradient": {
-              animation: `${shimmer} 4s linear infinite`,
-            },
-            "@media (prefers-reduced-motion: reduce)": {
-              transition: "none",
-              "&:hover": { transform: "none" },
-              "& .brandGradient": { animation: "none" },
-            },
           }}
         >
-          <AutoAwesome
-            sx={{
-              fontSize: 22,
-              color: "#ffea00",
-              filter: "drop-shadow(0 0 6px rgba(255,234,0,0.35))",
-              animation: `${sparkle} 5s ease-in-out infinite`,
-              "@media (prefers-reduced-motion: reduce)": { animation: "none" },
-            }}
-          />
           <Box
-            component="span"
-            className="brandGradient"
             sx={{
-              background: "linear-gradient(90deg, #00e5ff, #7c4dff, #ff4081)",
-              backgroundSize: "300% 300%",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background:
+                "linear-gradient(120deg, #90caf9, #ce93d8, #ffcc80, #90caf9)",
+              backgroundSize: "200% 200%",
+              animation: `${shimmer} 6s ease-in-out infinite`,
+              boxShadow: 3,
+            }}
+          >
+            <AutoAwesome
+              sx={{
+                fontSize: 20,
+                animation: `${sparkle} 2.8s ease-in-out infinite`,
+              }}
+            />
+          </Box>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{
+              fontWeight: 700,
+              letterSpacing: 0.5,
+              background:
+                "linear-gradient(90deg, #ffffff, #e3f2fd, #f3e5f5, #ffe0b2)",
+              backgroundClip: "text",
               WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              animation: `${shimmer} 12s linear infinite`,
+              color: "transparent",
             }}
           >
             FinanceBuddy
-          </Box>
-        </Typography>
+          </Typography>
+        </Box>
 
+        {/* Main nav buttons */}
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button color="inherit" component={RouterLink} to={homeTarget}>
             Home
@@ -97,11 +88,26 @@ export function NavBar() {
 
           {isAuthenticated && (
             <>
-              <Button color="inherit" component={RouterLink} to="/dashboard">
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/dashboard"
+              >
                 Dashboard
               </Button>
-              <Button color="inherit" component={RouterLink} to="/tools/euro">
-                European Option Calculator
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/tools/euro"
+              >
+                Euro Options
+              </Button>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/tools/american"
+              >
+                American Options
               </Button>
               <Button
                 color="inherit"
@@ -113,17 +119,36 @@ export function NavBar() {
               <Button
                 color="inherit"
                 component={RouterLink}
-                to="/tools/american"
+                to="/assistant"
+                startIcon={<AutoAwesome />}
+                sx={{
+                  borderRadius: 999,
+                  px: 2,
+                  textTransform: "none",
+                  background:
+                    "linear-gradient(120deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04))",
+                  border: "1px solid rgba(255,255,255,0.3)",
+                  boxShadow: 2,
+                  "&:hover": {
+                    boxShadow: 4,
+                    background:
+                      "linear-gradient(120deg, rgba(255,255,255,0.30), rgba(255,255,255,0.06))",
+                  },
+                }}
               >
-                American Option Calculator
-              </Button>
-              <Button color="inherit" onClick={logout}>
-                Logout
+                Assistant
               </Button>
             </>
           )}
+        </Box>
 
-          {!isAuthenticated && (
+        {/* Auth / session actions */}
+        <Box sx={{ display: "flex", gap: 1 }}>
+          {isAuthenticated ? (
+            <Button color="inherit" onClick={logout}>
+              Logout
+            </Button>
+          ) : (
             <>
               <Button color="inherit" component={RouterLink} to="/login">
                 Login

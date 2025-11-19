@@ -35,10 +35,12 @@ function App(): ReactElement {
       <NavBar />
       <Container maxWidth={false} disableGutters>
         <Routes>
+          {/* Public routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
+          {/* Protected routes */}
           <Route
             path="/dashboard"
             element={
@@ -47,6 +49,7 @@ function App(): ReactElement {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/assistant"
             element={
@@ -55,14 +58,7 @@ function App(): ReactElement {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/tools/american"
-            element={
-              <ProtectedRoute>
-                <AmericanOptionsPricing />
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="/tools/euro"
             element={
@@ -71,6 +67,16 @@ function App(): ReactElement {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/tools/american"
+            element={
+              <ProtectedRoute>
+                <AmericanOptionsPricing />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/tools/euro/greeks"
             element={
@@ -79,6 +85,8 @@ function App(): ReactElement {
               </ProtectedRoute>
             }
           />
+
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>

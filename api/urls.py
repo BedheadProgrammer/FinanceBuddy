@@ -1,7 +1,10 @@
+# api/urls.py
 from django.urls import path
 from . import views
 
 app_name = "api"
+
 urlpatterns = [
     path("prices", views.prices, name="prices"),
+    path("assistant/chat", views.assistant_chat, name="assistant_chat"),
 ]
