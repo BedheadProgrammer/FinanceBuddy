@@ -4,13 +4,13 @@ from typing import Iterable, Optional, Tuple
 
 from twelvedata import TDClient
 
-# this list shows well known stocks for selection
+
 
 POPULAR = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA",
     "BRK.B", "JPM", "NFLX", "AMD", "INTC", "BAC", "XOM"]
 
 def _get_td_client() -> TDClient:
-    " API KEY"
+
     api_key = os.environ.get("TWELVEDATA_API_KEY")
     if not api_key:
         raise RuntimeError(

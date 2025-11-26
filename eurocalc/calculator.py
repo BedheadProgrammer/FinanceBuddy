@@ -31,7 +31,7 @@ class SpotPriceCalculator:
         return float(self.ds.get_spot(symbol))
 
 
-# ---------------- Risk-free rate (continuous) ----------------
+
 
 class RiskFreeRateCalculator:
     """
@@ -53,7 +53,7 @@ class RiskFreeRateCalculator:
         return float(val)
 
 
-# ---------------- Dividend / carry yield q ----------------
+# ----------------      Dividend         -----------------
 
 class FundamentalsDividendYieldCalculator:
     """Dividend/carry yield from MarketDataSource; returns default if missing."""
@@ -185,9 +185,7 @@ class ImpliedVolatilityCalculator:
 # ---------------- Time to expiry T (year fraction) ----------------
 
 class YearFractionCalculator:
-    """
-    Actual/365 year fraction. If use_quantlib=True, uses QuantLib's Actual365Fixed.
-    """
+
     def __init__(self, use_quantlib: bool = False):
         self.use_quantlib = use_quantlib
         if use_quantlib:
@@ -215,7 +213,7 @@ def _N(x: float) -> float:    # standard normal cdf
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 class D1D2Calculator:
-    """BSM d1, d2 under continuous dividend yield q."""
+
     def compute(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> tuple[float, float]:
         if S <= 0 or K <= 0 or sigma <= 0 or T <= 0:
             raise ValueError("S, K, sigma, T must be positive.")
@@ -226,10 +224,7 @@ class D1D2Calculator:
         return d1, d2
 
 class GreeksCalculator:
-    """
-    Closed-form European price + Greeks with continuous dividend yield.
-    Returns dict with fair_value, delta, gamma, theta (per year), vega, rho.
-    """
+
     def compute(self, S: float, K: float, r: float, q: float, sigma: float, T: float, side: str) -> dict:
         side_u = side.upper()
         d1, d2 = D1D2Calculator().compute(S, K, r, q, sigma, T)
@@ -280,9 +275,9 @@ class BAWAmericanOptionCalculator:
     
     def compute(self, S: float, K: float, r: float, q: float, sigma: float, T: float, side: str) -> dict:
         """
-        Calculate American option price using BAW approximation.
+        Calculate American option price
         
-        Args:
+        Ins
             S: Current spot price
             K: Strike price
             r: Risk-free rate (continuous)
@@ -305,14 +300,14 @@ class BAWAmericanOptionCalculator:
         if side_u not in ("CALL", "PUT"):
             raise ValueError("side must be 'CALL' or 'PUT'")
         
-        # Get European price first
+
         euro_calc = GreeksCalculator()
         euro_result = euro_calc.compute(S, K, r, q, sigma, T, side_u)
         european_price = euro_result["fair_value"]
         
-        # Check for early exercise conditions
+
         if side_u == "CALL":
-            # American call with no dividends (q=0) = European call
+
             if q <= 1e-10:
                 return {
                     "american_price": european_price,
@@ -321,7 +316,7 @@ class BAWAmericanOptionCalculator:
                     "critical_price": float('inf'),  # Never optimal to exercise early
                 }
             
-            # Check immediate exercise value
+
             intrinsic = max(S - K, 0)
             if T < 1e-10:  # At expiry
                 return {
@@ -333,8 +328,8 @@ class BAWAmericanOptionCalculator:
             
             american_price, critical_price = self._baw_call(S, K, r, q, sigma, T)
         
-        else:  # PUT
-            # American put always has early exercise premium (can exercise early to get K)
+        else:
+
             intrinsic = max(K - S, 0)
             if T < 1e-10:  # At expiry
                 return {
@@ -356,19 +351,19 @@ class BAWAmericanOptionCalculator:
         }
     
     def _baw_call(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> tuple[float, float]:
-        """BAW approximation for American call."""
-        # Parameters
+
+
         M = 2.0 * r / (sigma * sigma)
         N = 2.0 * (r - q) / (sigma * sigma)
         K_factor = 1.0 - math.exp(-r * T)
         
-        # q2 coefficient
+
         q2 = 0.5 * (-(N - 1) + math.sqrt((N - 1) ** 2 + 4.0 * M / K_factor))
         
-        # Seed value for critical price S*
+
         S_star_seed = K + (K / (q2 - 1.0)) * (1.0 - math.exp(-q * T) * _N(self._d1(K, K, r, q, sigma, T)))
         
-        # Newton-Raphson iteration to find critical price S*
+
         S_star = S_star_seed
         for _ in range(self.max_iterations):
             d1 = self._d1(S_star, K, r, q, sigma, T)
@@ -379,35 +374,35 @@ class BAWAmericanOptionCalculator:
             if abs(diff) < self.tolerance:
                 break
             
-            # Derivative for Newton-Raphson
+
             d_diff = (1.0 - math.exp(-q * T) * _N(d1)) * (1.0 - 1.0 / q2) + math.exp(-q * T) * _phi(d1) / (sigma * math.sqrt(T))
             S_star = S_star - diff / d_diff
         
-        # Calculate American call price
+
         if S < S_star:
-            # Below critical price: use European + early exercise premium
+
             A2 = (S_star / q2) * (1.0 - math.exp(-q * T) * _N(self._d1(S_star, K, r, q, sigma, T)))
             american_call = self._european_call(S, K, r, q, sigma, T) + A2 * (S / S_star) ** q2
         else:
-            # Above critical price: immediate exercise optimal
+
             american_call = S - K
         
         return american_call, S_star
     
     def _baw_put(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> tuple[float, float]:
-        """BAW approximation for American put."""
-        # Parameters
+        """ approximation for American put."""
+
         M = 2.0 * r / (sigma * sigma)
         N = 2.0 * (r - q) / (sigma * sigma)
         K_factor = 1.0 - math.exp(-r * T)
         
-        # q1 coefficient (negative root for put)
+
         q1 = 0.5 * (-(N - 1) - math.sqrt((N - 1) ** 2 + 4.0 * M / K_factor))
         
-        # Seed value for critical price S**
+
         S_star_seed = K - (K / (1.0 - q1)) * (1.0 - math.exp(-q * T) * _N(-self._d1(K, K, r, q, sigma, T)))
         
-        # Newton-Raphson iteration to find critical price S**
+
         S_star = S_star_seed
         for _ in range(self.max_iterations):
             d1 = self._d1(S_star, K, r, q, sigma, T)
@@ -418,39 +413,36 @@ class BAWAmericanOptionCalculator:
             if abs(diff) < self.tolerance:
                 break
             
-            # Derivative for Newton-Raphson
+
             d_diff = -(1.0 - math.exp(-q * T) * _N(-d1)) * (1.0 - 1.0 / q1) - math.exp(-q * T) * _phi(d1) / (sigma * math.sqrt(T))
             S_star = S_star - diff / d_diff
         
-        # Calculate American put price
+
         if S > S_star:
-            # Above critical price: use European + early exercise premium
+
             A1 = -(S_star / q1) * (1.0 - math.exp(-q * T) * _N(-self._d1(S_star, K, r, q, sigma, T)))
             american_put = self._european_put(S, K, r, q, sigma, T) + A1 * (S / S_star) ** q1
         else:
-            # Below critical price: immediate exercise optimal
+
             american_put = K - S
         
         return american_put, S_star
     
     def _d1(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> float:
-        """Helper: Calculate d1."""
         return (math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
     
     def _european_call(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> float:
-        """Helper: European call price."""
         d1 = self._d1(S, K, r, q, sigma, T)
         d2 = d1 - sigma * math.sqrt(T)
         return S * math.exp(-q * T) * _N(d1) - K * math.exp(-r * T) * _N(d2)
     
     def _european_put(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> float:
-        """Helper: European put price."""
         d1 = self._d1(S, K, r, q, sigma, T)
         d2 = d1 - sigma * math.sqrt(T)
         return K * math.exp(-r * T) * _N(-d2) - S * math.exp(-q * T) * _N(-d1)
 
 
-# ---------------- Assembler (primitives in, full input set out) ----------------
+
 
 class VariablesAssembler:
     """

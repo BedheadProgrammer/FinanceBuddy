@@ -1,4 +1,21 @@
+// FinanceSt/frontend/src/pages/AmericanOptionsPricing.tsx
 import React, { useMemo, useState } from "react";
+import {
+  Box,
+  Grid,
+  Paper,
+  Typography,
+  TextField,
+  ToggleButtonGroup,
+  ToggleButton,
+  MenuItem,
+  FormControlLabel,
+  Switch,
+  Button,
+  Divider,
+  Stack,
+  Container,
+} from "@mui/material";
 import { usePageMeta } from "../hooks/usePageMeta";
 
 type Inputs = {
@@ -11,6 +28,8 @@ type AmericanResult = {
 type AmericanApiResponse = { inputs: Inputs; american_result: AmericanResult } | { error: string };
 
 export default function AmericanOptionsPricing() {
+  usePageMeta("American Option Calculator | FinanceBuddy", "American option calculator");
+
   const todayISO = useMemo(() => new Date().toISOString().slice(0,10), []);
   const [symbol, setSymbol] = useState("AAPL");
   const [side, setSide] = useState<"CALL"|"PUT">("CALL");
@@ -21,17 +40,12 @@ export default function AmericanOptionsPricing() {
   const [constantVol, setConstantVol] = useState("");
   const [useQL, setUseQL] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>();
-  const [data, setData] = useState<AmericanApiResponse>();
+  const [error, setError] = useState<string|null>(null);
+  const [data, setData] = useState<AmericanApiResponse|null>(null);
 
-  usePageMeta(
-    "American Option Pricing | FinanceBuddy",
-    "Compute American option prices, compare to European prices, and see early exercise premium and critical price using FinanceBuddy."
-  );
-
-  async function submit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(undefined); setData(undefined); setLoading(true);
+    setError(null); setData(null); setLoading(true);
 
     const params = new URLSearchParams({
       symbol: symbol.trim().toUpperCase(), side, strike: strike.trim(), expiry, vol_mode: volMode
@@ -42,66 +56,308 @@ export default function AmericanOptionsPricing() {
 
     try {
       const res = await fetch(`/api/american/price/?${params.toString()}`, {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
         credentials: "same-origin",
       });
       const json = await res.json();
       if (!res.ok || (json as any).error) {
         setError((json as any).error || `HTTP ${res.status}`);
+        setData(null);
       } else {
         setData(json as AmericanApiResponse);
       }
     } catch (err: any) {
       setError(err?.message || String(err));
+      setData(null);
     } finally {
       setLoading(false);
     }
   }
 
-  const validIV = volMode === "IV" ? marketOptionPrice.trim().length > 0 : true;
-
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">American Option — Price &amp; Premium</h1>
-      <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-        <div><label className="block font-medium">Symbol</label>
-          <input className="border p-2 w-full" value={symbol} onChange={e=>setSymbol(e.target.value)} /></div>
-        <div><label className="block font-medium">Side</label>
-          <select className="border p-2 w-full" value={side} onChange={e=>setSide(e.target.value as any)}>
-            <option value="CALL">CALL</option><option value="PUT">PUT</option></select></div>
-        <div><label className="block font-medium">Strike</label>
-          <input className="border p-2 w-full" inputMode="decimal" value={strike} onChange={e=>setStrike(e.target.value)} /></div>
-        <div><label className="block font-medium">Expiry</label>
-          <input className="border p-2 w-full" type="date" value={expiry} min={todayISO} onChange={e=>setExpiry(e.target.value)} /></div>
-        <div><label className="block font-medium">Volatility mode</label>
-          <select className="border p-2 w-full" value={volMode} onChange={e=>setVolMode(e.target.value as any)}>
-            <option value="HIST">Historical volatility</option><option value="IV">Implied volatility</option></select></div>
-        {volMode === "IV" && (
-          <div><label className="block font-medium">Market option price</label>
-            <input className="border p-2 w-full" inputMode="decimal" value={marketOptionPrice} onChange={e=>setMarketOptionPrice(e.target.value)} />
-            <p className="text-sm text-gray-600 mt-1">Required for IV solve.</p></div>
-        )}
-        <div><label className="block font-medium">Constant σ (optional)</label>
-          <input className="border p-2 w-full" placeholder="e.g. 0.25" inputMode="decimal" value={constantVol} onChange={e=>setConstantVol(e.target.value)} /></div>
-        <div className="flex items-center gap-2 mt-6"><input id="useQLAm" type="checkbox" checked={useQL} onChange={e=>setUseQL(e.target.checked)} />
-          <label htmlFor="useQLAm">Use QuantLib day count</label></div>
-        <div className="md:col-span-2"><button disabled={loading || !validIV} className="px-4 py-2 bg-black text-white disabled:opacity-50" type="submit">
-          {loading ? "Computing…" : "Compute American"}</button>
-          {!validIV && <span className="ml-3 text-red-600">Market option price required for IV.</span>}</div>
-      </form>
+    <Box
+      sx={{
+        minHeight: "calc(100vh - 120px)",
+        display: "flex",
+        alignItems: "center",
+        py: 4,
+      }}
+    >
+      <Container maxWidth="lg">
+        <Box sx={{ mb: 4, textAlign: "center" }}>
+          <Typography variant="h3" fontWeight={700} sx={{ mb: 1 }}>
+            American Option Calculator
+          </Typography>
+        </Box>
 
-      {error && <div className="mt-6 p-3 border border-red-300 bg-red-50 text-red-800">{error}</div>}
+        <Grid container spacing={3} justifyContent="center">
+          <Grid item xs={12} md={5}>
+            <Paper
+              elevation={3}
+              sx={{
+                p: 4,
+                borderRadius: 3,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "linear-gradient(160deg, #0f172a 0%, #020617 50%, #0f172a 100%)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              }}
+            >
+              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                Option setup
+              </Typography>
+              <Box component="form" onSubmit={handleSubmit}>
+                <Stack spacing={2.5}>
+                  <TextField
+                    label="Symbol"
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value)}
+                    size="small"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <Box>
+                    <Typography variant="caption" sx={{ mb: 1, display: "block" }}>
+                      Side
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={side}
+                      exclusive
+                      onChange={(_, v) => v && setSide(v)}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="CALL">CALL</ToggleButton>
+                      <ToggleButton value="PUT">PUT</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={6}>
+                      <TextField
+                        label="Strike"
+                        value={strike}
+                        onChange={(e) => setStrike(e.target.value)}
+                        size="small"
+                        fullWidth
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        label="Expiration"
+                        type="date"
+                        value={expiry}
+                        inputProps={{ min: todayISO }}
+                        onChange={(e) => setExpiry(e.target.value)}
+                        size="small"
+                        fullWidth
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                  </Grid>
+                  <TextField
+                    select
+                    label="Volatility source"
+                    value={volMode}
+                    onChange={(e) => setVolMode(e.target.value as "HIST" | "IV")}
+                    size="small"
+                    fullWidth
+                  >
+                    <MenuItem value="HIST">Historical volatility</MenuItem>
+                    <MenuItem value="IV">Implied volatility (needs market price)</MenuItem>
+                  </TextField>
+                  {volMode === "IV" && (
+                    <TextField
+                      label="Market option price"
+                      value={marketOptionPrice}
+                      onChange={(e) => setMarketOptionPrice(e.target.value)}
+                      size="small"
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  )}
+                  <TextField
+                    label="Constant σ override (optional)"
+                    value={constantVol}
+                    onChange={(e) => setConstantVol(e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder="e.g. 0.25"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <FormControlLabel
+                    control={<Switch checked={useQL} onChange={(e) => setUseQL(e.target.checked)} />}
+                    label="Use QuantLib day count"
+                  />
+                  {error && (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        bgcolor: "rgba(248, 113, 113, 0.1)",
+                        border: "1px solid rgba(248, 113, 113, 0.4)",
+                        borderRadius: 2,
+                        p: 1.2,
+                        color: "#fecaca",
+                      }}
+                    >
+                      {error}
+                    </Typography>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    size="large"
+                    disabled={loading}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: "none",
+                      py: 1.5,
+                      fontWeight: 600,
+                    }}
+                    fullWidth
+                  >
+                    {loading ? "Calculating…" : "Calculate price"}
+                  </Button>
+                </Stack>
+              </Box>
+            </Paper>
+          </Grid>
 
-      {data && (data as any).american_result && (
-        <div className="mt-8">
-          <h2 className="font-semibold mb-2">American Results</h2>
-          <table className="w-full text-sm"><tbody>
-            {Object.entries((data as any).american_result).map(([k,v]) => (
-              <tr key={k}><td className="py-1 pr-3 text-gray-600">{k}</td><td className="py-1 font-mono">{Number(v as number).toFixed(6)}</td></tr>
-            ))}
-          </tbody></table>
-        </div>
-      )}
-    </div>
+          <Grid item xs={12} md={7}>
+            <Paper
+              elevation={2}
+              sx={{
+                p: 4,
+                borderRadius: 3,
+                border: "1px solid rgba(255,255,255,0.05)",
+                backgroundColor: "rgba(2,6,23,0.4)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    Latest result
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Shows the last successful calculation from the backend.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!data || !(data as any).american_result}
+                  sx={{ borderRadius: 999, textTransform: "none" }}
+                >
+                  View details
+                </Button>
+              </Box>
+
+              <Divider sx={{ my: 2.5 }} />
+
+              {!data || !(data as any).american_result ? (
+                <Box sx={{ py: 6, textAlign: "center" }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Run a calculation to see American vs. European price and premium.
+                  </Typography>
+                </Box>
+              ) : (
+                <Box>
+                  <Box
+                    sx={{
+                      mb: 3,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        American price
+                      </Typography>
+                      <Typography variant="h3" fontWeight={700} sx={{ mt: 0.5 }}>
+                        ${(data as any).american_result.american_price.toFixed(2)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 0.5, display: "block" }}
+                      >
+                        {(data as any).inputs.side} on {(data as any).inputs.symbol} @ {(data as any).inputs.K}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "right" }}>
+                      <Typography variant="caption" color="text.secondary">
+                        As of
+                      </Typography>
+                      <Typography variant="body2">
+                        {new Date((data as any).inputs.as_of).toLocaleDateString()}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Exp: {new Date((data as any).inputs.expiry).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          European price
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).american_result.european_price.toFixed(4)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Early exercise premium
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).american_result.early_exercise_premium.toFixed(6)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Critical price
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).american_result.critical_price.toFixed(6)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Strike
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).inputs.K.toFixed ? (data as any).inputs.K.toFixed(2) : (data as any).inputs.K}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
   );
 }

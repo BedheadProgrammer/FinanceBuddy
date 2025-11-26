@@ -15,9 +15,8 @@ class MarketDataSource:
 
 
 class AlphaVantageDataSource(MarketDataSource):
-    """
-    Alpha Vantage via official client.
-    """
+
+
 
     def __init__(self, api_key: Optional[str] = None, pause_s: float = 12.0):
         key = api_key or os.getenv("ALPHAVANTAGE_API_KEY") or os.getenv("ALPHA_VANTAGE_API_KEY")
@@ -38,7 +37,7 @@ class AlphaVantageDataSource(MarketDataSource):
         time.sleep(self._pause_s)
 
     def get_spot(self, symbol: str) -> float:
-        # Prefer quote; fallback to latest daily close.
+
         try:
             data, _ = self._ts.get_quote_endpoint(symbol=symbol)
             px = data.get("05. price")
@@ -219,10 +218,7 @@ class YFinanceDataSource(MarketDataSource):
 
 
 class CombinedDataSource(MarketDataSource):
-    """
-    Try Alpha Vantage → TwelveData → yfinance in order.
-    Use at least one configured source.
-    """
+
 
     def __init__(self):
         self._sources: List[MarketDataSource] = []
@@ -240,7 +236,7 @@ class CombinedDataSource(MarketDataSource):
             pass
         if not self._sources:
             raise RuntimeError(
-                "No data sources available. Set ALPHAVANTAGE_API_KEY or TWELVEDATA_API_KEY, or install yfinance."
+                "No data sources available."
             )
 
     def _first_ok(self, fn_name: str, *args, **kwargs):

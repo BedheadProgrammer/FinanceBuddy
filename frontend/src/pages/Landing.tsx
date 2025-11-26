@@ -10,7 +10,7 @@ export function Landing() {
 
   return (
     <Box>
-      {/* Hero Section */}
+
       <Box
         sx={{
           position: 'relative',
