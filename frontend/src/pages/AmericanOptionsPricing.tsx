@@ -23,7 +23,7 @@ type Inputs = {
   d1: number; d2: number; side: "CALL"|"PUT"; symbol: string; as_of: string; expiry: string;
 };
 type AmericanResult = {
-  american_price: number; european_price: number; early_exercise_premium: number; critical_price: number;
+  american_price: number; european_price: number; early_exercise_premium: number; critical_price: number | null;
 };
 type AmericanApiResponse = { inputs: Inputs; american_result: AmericanResult } | { error: string };
 
@@ -334,8 +334,19 @@ export default function AmericanOptionsPricing() {
                           Critical price
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {(data as any).american_result.critical_price.toFixed(6)}
-                        </Typography>
+                        {(() => {
+                            const cp = (data as any).american_result
+                            .critical_price as number | null;
+
+                        if (cp == null || !Number.isFinite(cp)) {
+                        return "No finite boundary";
+    }
+
+    return cp.toFixed(6);
+  })()}
+</Typography>
+
+
                       </Paper>
                     </Grid>
                     <Grid item xs={6} sm={3}>

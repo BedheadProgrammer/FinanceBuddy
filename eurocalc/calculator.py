@@ -313,7 +313,7 @@ class BAWAmericanOptionCalculator:
                     "american_price": european_price,
                     "european_price": european_price,
                     "early_exercise_premium": 0.0,
-                    "critical_price": float('inf'),  # Never optimal to exercise early
+                    "critical_price": None,  # Never optimal to exercise early
                 }
             
 
