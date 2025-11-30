@@ -11,15 +11,16 @@ class LoginRequiredMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        # Public prefixes (adjust as needed)
+
         static_url = (getattr(settings, "STATIC_URL", "/static/") or "/static/")
         self.allow_prefixes = tuple([
-            "/accounts/",      # allauth (login, signup, etc.)
-            "/api/prices",     # public quotes API
-            "/api/euro/",      # European options API
-            "/api/american/",  # American options API
-            "/assets/",        # Vite built assets
-            "/vite.svg",       # Vite icon
+            "/accounts/",
+            "/api/prices",
+            "/api/euro/",
+            "/api/american/",
+            "/assets/",
+            "/vite.svg",
+            "/api/assistant/",
             static_url.rstrip("/"),
         ])
         self.admin_allow = ("/admin/login", "/admin/logout", "/admin/password_reset")

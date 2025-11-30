@@ -1,9 +1,11 @@
-# api/views.py
 from __future__ import annotations
 
 import json
 import os
 from typing import Dict, List
+
+from openai import OpenAI
+from dotenv import load_dotenv
 
 from django.http import JsonResponse, HttpRequest
 from django.views.decorators.csrf import csrf_exempt
@@ -11,159 +13,170 @@ from django.views.decorators.http import require_GET, require_POST
 
 from BE1.MRKT_WTCH import get_current_prices, POPULAR
 
-from openai import OpenAI
-from openai._exceptions import OpenAIError  # type: ignore[attr-defined]
-
-# Single shared OpenAI client; uses OPENAI_API_KEY from the environment
-# as described in the OpenAI API docs.
-_client = OpenAI()
-_ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")
+load_dotenv()
+client = OpenAI()
 
 
 @require_GET
 def prices(request: HttpRequest) -> JsonResponse:
-    """
-    Existing market prices endpoint used by the Dashboard.
-    (Left exactly as it was.)
-    """
+
     raw = request.GET.get("symbols", "")
     symbols = [s.strip().upper() for s in raw.split(",") if s.strip()] or POPULAR
     data = get_current_prices(symbols)
     return JsonResponse(data)
 
-
 @csrf_exempt
 @require_POST
-def assistant_chat(request: HttpRequest) -> JsonResponse:
-    """
-    Chat endpoint that proxies to the FinanceBud Assistant via the Assistants API.
+def american_assistant(request: HttpRequest) -> JsonResponse:
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
-    Request JSON:
-        {
-          "message": "string",            # required user message
-          "thread_id": "thread_...",      # optional existing thread id to continue chat
-          "metadata": { ... }             # optional dict we pass as run.metadata
-        }
-
-    Response JSON:
-        {
-          "thread_id": "thread_...",
-          "reply": "assistant reply text",
-          "messages": [
-            {"role": "user", "content": "hi"},
-            {"role": "assistant", "content": "hello ..."},
-            ...
-          ]
-        }
-
-    Flow (per Assistants API docs):
-      1) Create or fetch a Thread
-      2) Add a user Message to that Thread
-      3) Create a Run for your FinanceBud assistant and wait until it completes
-      4) List Messages from the Thread and return the latest assistant reply
-    """
-
-    if _ASSISTANT_ID is None:
+    snapshot = payload.get("snapshot")
+    if not isinstance(snapshot, dict) or "inputs" not in snapshot or "american_result" not in snapshot:
         return JsonResponse(
-            {
-                "error": (
-                    "OPENAI_ASSISTANT_ID is not set on the server. "
-                    "Set it to your FinanceBud assistant id (asst_...)."
-                )
-            },
+            {"error": "snapshot with inputs and american_result is required"},
+            status=400,
+        )
+
+    raw_messages = payload.get("messages")
+    single_message = payload.get("message")
+
+    user_messages: List[Dict[str, str]] = []
+
+    if isinstance(raw_messages, list) and raw_messages:
+        for m in raw_messages:
+            role = m.get("role")
+            content = str(m.get("content") or "").strip()
+            if role in ("user", "assistant") and content:
+                user_messages.append({"role": role, "content": content})
+    elif isinstance(single_message, str) and single_message.strip():
+        user_messages.append({"role": "user", "content": single_message.strip()})
+    else:
+        return JsonResponse({"error": "message or messages is required"}, status=400)
+
+    system_prompt = (
+        "You are FinanceBud, an options-education assistant inside the FinanceBuddy app. "
+        "You receive snapshots of American option pricing runs as JSON and explain them to the user. "
+        "The snapshot has two keys: 'inputs' (pricing inputs like S, K, r, q, sigma, T, side, symbol, "
+        "as_of, expiry, d1, d2) and 'american_result' (american_price, european_price, "
+        "early_exercise_premium, critical_price).  When you structure your response give the real world names not the data point names"
+        "Explain what the numbers mean in plain English, focusing on intuition, risk, and exercise logic. "
+        "Keep answers concise and structured with short paragraphs or bullet points."
+    )
+
+    snapshot_text = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False)
+
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "system",
+            "content": f"Here is the latest American option snapshot as JSON: {snapshot_text}",
+        },
+    ]
+    messages.extend(user_messages)
+
+    try:
+        resp = client.responses.create(
+            model=os.getenv("OPENAI_ASSISTANT_MODEL", "gpt-5-nano"),
+            input=messages,
+        )
+    except Exception as e:
+        return JsonResponse(
+            {"error": "OpenAI request failed", "detail": str(e)},
             status=500,
         )
 
-    # Parse JSON body
+    reply_text = getattr(resp, "output_text", None)
+    if not reply_text and getattr(resp, "output", None):
+        try:
+            first = resp.output[0]
+            if first and getattr(first, "content", None):
+                reply_text = first.content[0].text
+        except Exception:
+            reply_text = None
+
+    if not reply_text:
+        return JsonResponse({"error": "Assistant returned no text"}, status=500)
+
+    return JsonResponse({"reply": reply_text})
+
+
+
+@csrf_exempt
+@require_POST
+def euro_assistant(request: HttpRequest) -> JsonResponse:
     try:
-        body = json.loads(request.body.decode("utf-8"))
+        payload = json.loads(request.body.decode("utf-8"))
     except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON payload"}, status=400)
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
-    user_message = (body.get("message") or "").strip()
-    thread_id = body.get("thread_id") or None
-    run_metadata = body.get("metadata") or None
+    snapshot = payload.get("snapshot")
+    if not isinstance(snapshot, dict) or "inputs" not in snapshot or "price_and_greeks" not in snapshot:
+        return JsonResponse(
+            {"error": "snapshot with inputs and price_and_greeks is required"},
+            status=400,
+        )
 
-    if not user_message:
-        return JsonResponse({"error": "'message' is required"}, status=400)
+    raw_messages = payload.get("messages")
+    single_message = payload.get("message")
+
+    user_messages: List[Dict[str, str]] = []
+
+    if isinstance(raw_messages, list) and raw_messages:
+        for m in raw_messages:
+            role = m.get("role")
+            content = str(m.get("content") or "").strip()
+            if role in ("user", "assistant") and content:
+                user_messages.append({"role": role, "content": content})
+    elif isinstance(single_message, str) and single_message.strip():
+        user_messages.append({"role": "user", "content": single_message.strip()})
+    else:
+        return JsonResponse({"error": "message or messages is required"}, status=400)
+
+    system_prompt = (
+        "You are FinanceBud, an options-education assistant inside the FinanceBuddy app. "
+        "You receive snapshots of European option pricing runs as JSON and explain them to the user. "
+        "The snapshot has two keys: 'inputs' (symbol, side, S, K, r, q, sigma, T, as_of, expiry)  "
+        "and 'price_and_greeks' (fair_value, delta, gamma, theta, vega, rho). If critical price is too high, it will list N/A explain why (too close to european option, no early exercise premium)"
+        "Explain what the fair value and each Greek mean in practical terms for the trader, "
+        "including how they relate to price moves, volatility, time decay, and interest rates. "
+        "Keep answers concise and structured with short paragraphs or bullet points."
+    )
+
+    snapshot_text = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False)
+
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "system",
+            "content": f"Here is the latest European option snapshot as JSON: {snapshot_text}",
+        },
+    ]
+    messages.extend(user_messages)
 
     try:
-        # 1) Create or retrieve the Thread
-        if thread_id:
-            # Confirm the thread exists; will raise if not
-            thread = _client.beta.threads.retrieve(thread_id=thread_id)
-        else:
-            thread = _client.beta.threads.create()
-
-        # 2) Append the user message
-        _client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=user_message,
+        resp = client.responses.create(
+            model=os.getenv("OPENAI_ASSISTANT_MODEL", "gpt-5-nano"),
+            input=messages,
         )
-
-        # 3) Create a Run and block until it finishes (create_and_poll helper)
-        # See the Assistants docs / examples for this pattern.
-        run = _client.beta.threads.runs.create_and_poll(
-            thread_id=thread.id,
-            assistant_id=_ASSISTANT_ID,
-            metadata=run_metadata,
-        )
-
-        if run.status != "completed":
-            # Surface non-successful status to the frontend
-            return JsonResponse(
-                {
-                    "error": "Assistant run did not complete successfully.",
-                    "status": run.status,
-                },
-                status=502,
-            )
-
-        # 4) Retrieve all messages and convert to a simple [{role, content}] list
-        #    We request ascending order for an already-chronological transcript.
-        messages_page = _client.beta.threads.messages.list(
-            thread_id=thread.id,
-            order="asc",
-        )
-
-        chat_messages: List[Dict[str, str]] = []
-        latest_reply_text = ""
-
-        for msg in messages_page.data:
-            text_chunks: List[str] = []
-            for c in msg.content:
-                # Text content blocks per Messages API docs
-                if getattr(c, "type", None) == "text":
-                    text_chunks.append(c.text.value)  # type: ignore[union-attr]
-
-            if not text_chunks:
-                continue
-
-            merged_text = "\n".join(text_chunks).strip()
-            if not merged_text:
-                continue
-
-            role = msg.role  # "user" or "assistant"
-            chat_messages.append({"role": role, "content": merged_text})
-            if role == "assistant":
-                latest_reply_text = merged_text
-
-        if not latest_reply_text:
-            latest_reply_text = "(No assistant reply was returned for this run.)"
-
+    except Exception as e:
         return JsonResponse(
-            {
-                "thread_id": thread.id,
-                "reply": latest_reply_text,
-                "messages": chat_messages,
-            }
+            {"error": "OpenAI request failed", "detail": str(e)},
+            status=500,
         )
 
-    except OpenAIError as e:
-        return JsonResponse(
-            {"error": f"OpenAI API error: {getattr(e, 'message', str(e))}"},
-            status=502,
-        )
-    except Exception as e:  # generic safety net
-        return JsonResponse({"error": str(e)}, status=500)
+    reply_text = getattr(resp, "output_text", None)
+    if not reply_text and getattr(resp, "output", None):
+        try:
+            first = resp.output[0]
+            if first and getattr(first, "content", None):
+                reply_text = first.content[0].text
+        except Exception:
+            reply_text = None
+
+    if not reply_text:
+        return JsonResponse({"error": "Assistant returned no text"}, status=500)
+
+    return JsonResponse({"reply": reply_text})

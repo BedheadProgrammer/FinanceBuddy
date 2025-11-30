@@ -1,4 +1,20 @@
 import React, { useMemo, useState } from "react";
+import {
+  Box,
+  Grid,
+  Paper,
+  Typography,
+  TextField,
+  ToggleButtonGroup,
+  ToggleButton,
+  MenuItem,
+  FormControlLabel,
+  Switch,
+  Button,
+  Divider,
+  Stack,
+  Container,
+} from "@mui/material";
 import { usePageMeta } from "../hooks/usePageMeta";
 
 type Inputs = {
@@ -6,32 +22,131 @@ type Inputs = {
   d1: number; d2: number; side: "CALL"|"PUT"; symbol: string; as_of: string; expiry: string;
 };
 type AmericanResult = {
-  american_price: number; european_price: number; early_exercise_premium: number; critical_price: number;
+  american_price: number; european_price: number; early_exercise_premium: number; critical_price: number | null;
 };
 type AmericanApiResponse = { inputs: Inputs; american_result: AmericanResult } | { error: string };
 
+type AssistantMessage = { id: number; role: "user" | "assistant"; content: string };
+
 export default function AmericanOptionsPricing() {
+  usePageMeta("American Option Calculator | FinanceBuddy", "American option calculator");
+
   const todayISO = useMemo(() => new Date().toISOString().slice(0,10), []);
   const [symbol, setSymbol] = useState("AAPL");
   const [side, setSide] = useState<"CALL"|"PUT">("CALL");
   const [strike, setStrike] = useState("200");
-  const [expiry, setExpiry] = useState("2026-01-17");
-  const [volMode, setVolMode] = useState<"HIST"|"IV">("HIST");
+  const [expiry, setExpiry] = useState("2026-01-16");
+  const [volMode, setVolMode] = useState<"HIST"|"IV"|"CONST">("HIST");
   const [marketOptionPrice, setMarketOptionPrice] = useState("");
   const [constantVol, setConstantVol] = useState("");
   const [useQL, setUseQL] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>();
-  const [data, setData] = useState<AmericanApiResponse>();
+  const [error, setError] = useState<string|null>(null);
+  const [data, setData] = useState<AmericanApiResponse|null>(null);
 
-  usePageMeta(
-    "American Option Pricing | FinanceBuddy",
-    "Compute American option prices, compare to European prices, and see early exercise premium and critical price using FinanceBuddy."
-  );
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantInput, setAssistantInput] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
+  function buildAssistantSnapshot() {
+    if (!data || (data as any).error || !(data as any).american_result) return null;
+    return {
+      inputs: (data as any).inputs,
+      american_result: (data as any).american_result,
+    };
+  }
+
+  async function handleOpenAssistant() {
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+    setAssistantError(null);
+    setAssistantOpen(true);
+    if (assistantMessages.length > 0) return;
+
+    setAssistantLoading(true);
+    try {
+      const resp = await fetch("/api/assistant/american/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          message:
+            "Explain this American option pricing result in simple terms, including what the prices, premium, and early exercise behavior mean for the trader.",
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else {
+        setAssistantMessages([
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: (json as any).reply ?? "",
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  async function handleSendAssistantMessage(e: React.FormEvent) {
     e.preventDefault();
-    setError(undefined); setData(undefined); setLoading(true);
+    const trimmed = assistantInput.trim();
+    if (!trimmed) return;
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+
+    const newUserMessage: AssistantMessage = {
+      id: Date.now(),
+      role: "user",
+      content: trimmed,
+    };
+    const history = [...assistantMessages, newUserMessage];
+    setAssistantMessages(history);
+    setAssistantInput("");
+    setAssistantLoading(true);
+    setAssistantError(null);
+
+    try {
+      const resp = await fetch("/api/assistant/american/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          messages: history.map(m => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else if ((json as any).reply) {
+        setAssistantMessages(prev => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            role: "assistant",
+            content: (json as any).reply,
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null); setData(null); setLoading(true);
 
     const params = new URLSearchParams({
       symbol: symbol.trim().toUpperCase(), side, strike: strike.trim(), expiry, vol_mode: volMode
@@ -42,66 +157,404 @@ export default function AmericanOptionsPricing() {
 
     try {
       const res = await fetch(`/api/american/price/?${params.toString()}`, {
-        headers: { "Accept": "application/json" },
+        headers: { Accept: "application/json" },
         credentials: "same-origin",
       });
       const json = await res.json();
       if (!res.ok || (json as any).error) {
-        setError((json as any).error || `HTTP ${res.status}`);
+        setError((json as any).error || "Something went wrong");
+        setData(null);
       } else {
         setData(json as AmericanApiResponse);
       }
     } catch (err: any) {
-      setError(err?.message || String(err));
+      setError(err?.message || "Something went wrong");
+      setData(null);
     } finally {
       setLoading(false);
     }
   }
 
-  const validIV = volMode === "IV" ? marketOptionPrice.trim().length > 0 : true;
-
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">American Option — Price &amp; Premium</h1>
-      <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-        <div><label className="block font-medium">Symbol</label>
-          <input className="border p-2 w-full" value={symbol} onChange={e=>setSymbol(e.target.value)} /></div>
-        <div><label className="block font-medium">Side</label>
-          <select className="border p-2 w-full" value={side} onChange={e=>setSide(e.target.value as any)}>
-            <option value="CALL">CALL</option><option value="PUT">PUT</option></select></div>
-        <div><label className="block font-medium">Strike</label>
-          <input className="border p-2 w-full" inputMode="decimal" value={strike} onChange={e=>setStrike(e.target.value)} /></div>
-        <div><label className="block font-medium">Expiry</label>
-          <input className="border p-2 w-full" type="date" value={expiry} min={todayISO} onChange={e=>setExpiry(e.target.value)} /></div>
-        <div><label className="block font-medium">Volatility mode</label>
-          <select className="border p-2 w-full" value={volMode} onChange={e=>setVolMode(e.target.value as any)}>
-            <option value="HIST">Historical volatility</option><option value="IV">Implied volatility</option></select></div>
-        {volMode === "IV" && (
-          <div><label className="block font-medium">Market option price</label>
-            <input className="border p-2 w-full" inputMode="decimal" value={marketOptionPrice} onChange={e=>setMarketOptionPrice(e.target.value)} />
-            <p className="text-sm text-gray-600 mt-1">Required for IV solve.</p></div>
-        )}
-        <div><label className="block font-medium">Constant σ (optional)</label>
-          <input className="border p-2 w-full" placeholder="e.g. 0.25" inputMode="decimal" value={constantVol} onChange={e=>setConstantVol(e.target.value)} /></div>
-        <div className="flex items-center gap-2 mt-6"><input id="useQLAm" type="checkbox" checked={useQL} onChange={e=>setUseQL(e.target.checked)} />
-          <label htmlFor="useQLAm">Use QuantLib day count</label></div>
-        <div className="md:col-span-2"><button disabled={loading || !validIV} className="px-4 py-2 bg-black text-white disabled:opacity-50" type="submit">
-          {loading ? "Computing…" : "Compute American"}</button>
-          {!validIV && <span className="ml-3 text-red-600">Market option price required for IV.</span>}</div>
-      </form>
+    <Box sx={{ py: 6 }}>
+      <Container maxWidth="lg">
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={5}>
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                background: "radial-gradient(circle at top left, #1e293b 0%, #020617 55%, #000 100%)",
+                border: "1px solid rgba(148,163,184,0.4)",
+                boxShadow: "0 18px 60px rgba(15,23,42,0.9)",
+              }}
+            >
+              <Stack spacing={2.5}>
+                <Box>
+                  <Typography variant="overline" sx={{ letterSpacing: 2 }} color="primary.light">
+                    FinanceBud
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                    American option calculator
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Price an American call or put using the Barone-Adesi Whaley approximation with live
+                    market inputs.
+                  </Typography>
+                </Box>
 
-      {error && <div className="mt-6 p-3 border border-red-300 bg-red-50 text-red-800">{error}</div>}
+                <Box component="form" onSubmit={handleSubmit}>
+                  <Stack spacing={2}>
+                    <TextField
+                      label="Symbol"
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                      size="small"
+                      fullWidth
+                    />
 
-      {data && (data as any).american_result && (
-        <div className="mt-8">
-          <h2 className="font-semibold mb-2">American Results</h2>
-          <table className="w-full text-sm"><tbody>
-            {Object.entries((data as any).american_result).map(([k,v]) => (
-              <tr key={k}><td className="py-1 pr-3 text-gray-600">{k}</td><td className="py-1 font-mono">{Number(v as number).toFixed(6)}</td></tr>
-            ))}
-          </tbody></table>
-        </div>
-      )}
-    </div>
+                    <ToggleButtonGroup
+                      color="primary"
+                      value={side}
+                      exclusive
+                      onChange={(_, next) => next && setSide(next)}
+                      size="small"
+                    >
+                      <ToggleButton value="CALL">Call</ToggleButton>
+                      <ToggleButton value="PUT">Put</ToggleButton>
+                    </ToggleButtonGroup>
+
+                    <Grid container spacing={1.5}>
+                      <Grid item xs={6}>
+                        <TextField
+                          label="Strike"
+                          value={strike}
+                          onChange={(e) => setStrike(e.target.value)}
+                          size="small"
+                          fullWidth
+                          type="number"
+                          inputProps={{ step: "0.01" }}
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          label="Expiration"
+                          type="date"
+                          size="small"
+                          fullWidth
+                          value={expiry}
+                          onChange={(e) => setExpiry(e.target.value)}
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{ min: todayISO }}
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <TextField
+                      select
+                      label="Volatility mode"
+                      size="small"
+                      fullWidth
+                      value={volMode}
+                      onChange={(e) => setVolMode(e.target.value as any)}
+                    >
+                      <MenuItem value="HIST">Use historical volatility</MenuItem>
+                      <MenuItem value="IV">Match market option price (IV)</MenuItem>
+                      <MenuItem value="CONST">Use constant volatility</MenuItem>
+                    </TextField>
+
+                    {volMode === "IV" && (
+                      <TextField
+                        label="Market option price"
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={marketOptionPrice}
+                        onChange={(e) => setMarketOptionPrice(e.target.value)}
+                        InputProps={{ startAdornment: <span>$</span> as any }}
+                      />
+                    )}
+
+                    {volMode === "CONST" && (
+                      <TextField
+                        label="Constant volatility (σ)"
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={constantVol}
+                        onChange={(e) => setConstantVol(e.target.value)}
+                        InputProps={{ endAdornment: <span>%</span> as any }}
+                      />
+                    )}
+
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={useQL}
+                          onChange={(e) => setUseQL(e.target.checked)}
+                          size="small"
+                        />
+                      }
+                      label="Use QuantLib day count"
+                    />
+
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="large"
+                      disabled={loading}
+                      sx={{
+                        mt: 1,
+                        borderRadius: 999,
+                        textTransform: "none",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {loading ? "Pricing..." : "Run American pricing"}
+                    </Button>
+
+                    {error && (
+                      <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                        {error}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              </Stack>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} md={7}>
+            <Paper
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                background: "radial-gradient(circle at top, #020617 0%, #020617 55%, #000 100%)",
+                border: "1px solid rgba(148,163,184,0.4)",
+                minHeight: 260,
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    Latest result
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Shows the last successful calculation from the backend.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!data || !(data as any).american_result}
+                  sx={{ borderRadius: 999, textTransform: "none" }}
+                  onClick={handleOpenAssistant}
+                >
+                  View details
+                </Button>
+              </Box>
+
+              <Divider sx={{ my: 2.5 }} />
+
+              {!data || !(data as any).american_result ? (
+                <Box sx={{ py: 6, textAlign: "center" }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Run a calculation to see American vs. European price and premium.
+                  </Typography>
+                </Box>
+              ) : (
+                <Box>
+                  <Box
+                    sx={{
+                      mb: 3,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        American price
+                      </Typography>
+                      <Typography variant="h3" fontWeight={700} sx={{ mt: 0.5 }}>
+                        ${(data as any).american_result.american_price.toFixed(2)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 0.5, display: "block" }}
+                      >
+                        {(data as any).inputs.side} on {(data as any).inputs.symbol} @ {(data as any).inputs.K}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "right" }}>
+                      <Typography variant="caption" color="text.secondary">
+                        As of
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontVariantNumeric: "tabular-nums", display: "block" }}
+                      >
+                        {(data as any).inputs.as_of}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                        Exp: {(data as any).inputs.expiry}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          European price
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).american_result.european_price.toFixed(4)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Early exercise premium
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).american_result.early_exercise_premium.toFixed(6)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Critical price
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).american_result.critical_price === null
+                            ? "N/A"
+                            : (data as any).american_result.critical_price.toFixed(4)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Strike
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                          {(data as any).inputs.K.toFixed
+                            ? (data as any).inputs.K.toFixed(2)
+                            : (data as any).inputs.K}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+
+                  {assistantOpen && (
+                    <Box
+                      sx={{
+                        mt: 3,
+                        p: 2,
+                        borderRadius: 2,
+                        border: "1px solid rgba(148,163,184,0.4)",
+                        backgroundColor: "rgba(15,23,42,0.6)",
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                        FinanceBud's explanation
+                      </Typography>
+                      {assistantError && (
+                        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                          {assistantError}
+                        </Typography>
+                      )}
+                      <Box
+                        sx={{
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          mb: 1.5,
+                          pr: 1,
+                        }}
+                      >
+                        {assistantMessages.length === 0 && !assistantLoading && !assistantError && (
+                          <Typography variant="body2" color="text.secondary">
+                            Click "View details" to ask FinanceBud about this American option run.
+                          </Typography>
+                        )}
+                        {assistantMessages.map((msg) => (
+                          <Box
+                            key={msg.id}
+                            sx={{
+                              mb: 1,
+                              textAlign: msg.role === "user" ? "right" : "left",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "inline-block",
+                                px: 1.5,
+                                py: 1,
+                                borderRadius: 2,
+                                backgroundColor:
+                                  msg.role === "user"
+                                    ? "rgba(59,130,246,0.3)"
+                                    : "rgba(15,23,42,0.9)",
+                              }}
+                            >
+                              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                                {msg.content}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                        {assistantLoading && (
+                          <Typography variant="body2" color="text.secondary">
+                            Thinking...
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box
+                        component="form"
+                        onSubmit={handleSendAssistantMessage}
+                        sx={{ display: "flex", gap: 1 }}
+                      >
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Ask a question about this result..."
+                          value={assistantInput}
+                          onChange={(e) => setAssistantInput(e.target.value)}
+                          disabled={assistantLoading}
+                          variant="outlined"
+                        />
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          disabled={assistantLoading || !assistantInput.trim()}
+                        >
+                          Send
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
   );
 }

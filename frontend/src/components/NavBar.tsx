@@ -29,7 +29,7 @@ export function NavBar() {
           gap: 2,
         }}
       >
-        {/* Brand / Logo */}
+
         <Box
           component={RouterLink}
           to={homeTarget}
@@ -88,61 +88,23 @@ export function NavBar() {
 
           {isAuthenticated && (
             <>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/dashboard"
-              >
+              <Button color="inherit" component={RouterLink} to="/dashboard">
                 Dashboard
               </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/tools/euro"
-              >
+              <Button color="inherit" component={RouterLink} to="/tools/euro">
                 Euro Options
               </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/tools/american"
-              >
+              <Button color="inherit" component={RouterLink} to="/tools/american">
                 American Options
               </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/tools/euro/greeks"
-              >
+              <Button color="inherit" component={RouterLink} to="/tools/euro/greeks">
                 Greeks
-              </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/assistant"
-                startIcon={<AutoAwesome />}
-                sx={{
-                  borderRadius: 999,
-                  px: 2,
-                  textTransform: "none",
-                  background:
-                    "linear-gradient(120deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04))",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  boxShadow: 2,
-                  "&:hover": {
-                    boxShadow: 4,
-                    background:
-                      "linear-gradient(120deg, rgba(255,255,255,0.30), rgba(255,255,255,0.06))",
-                  },
-                }}
-              >
-                Assistant
               </Button>
             </>
           )}
         </Box>
 
-        {/* Auth / session actions */}
+
         <Box sx={{ display: "flex", gap: 1 }}>
           {isAuthenticated ? (
             <Button color="inherit" onClick={logout}>

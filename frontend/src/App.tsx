@@ -5,7 +5,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import { Footer } from "./components/Footer";
 import { NavBar } from "./components/NavBar";
-import { Assistant } from "./pages/Assistant";
 import { Dashboard } from "./pages/Dashboard";
 import EuroOptionsPricing from "./pages/EuroOptionsPricing";
 import GreeksVisualization from "./pages/GreeksVisualization";
@@ -50,14 +49,6 @@ function App(): ReactElement {
             }
           />
 
-          <Route
-            path="/assistant"
-            element={
-              <ProtectedRoute>
-                <Assistant />
-              </ProtectedRoute>
-            }
-          />
 
           <Route
             path="/tools/euro"

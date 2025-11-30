@@ -4,41 +4,56 @@ from functools import lru_cache
 from datetime import datetime
 import os
 import time
+import math
 import requests
 
 
-class MarketDataSource:
+def _normalize_dividend_yield(value: Optional[float]) -> Optional[float]:
+    try:
+        y = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(y):
+        return None
+    if y <= 0:
+        return None
+    if y < 1e-6:
+        return None
+    if y <= 0.25:
+        y_norm = y
+    elif y <= 25.0:
+        y_norm = y / 100.0
+    elif y <= 100.0:
+        y_norm = y / 100.0
+    else:
+        return None
+    if y_norm > 0.25:
+        y_norm = 0.25
+    return y_norm
 
+
+class MarketDataSource:
     def get_spot(self, symbol: str) -> float: ...
     def get_daily_closes(self, symbol: str, need: int = 252) -> List[float]: ...
     def get_dividend_yield(self, symbol: str) -> Optional[float]: ...
 
 
 class AlphaVantageDataSource(MarketDataSource):
-    """
-    Alpha Vantage via official client.
-    """
-
     def __init__(self, api_key: Optional[str] = None, pause_s: float = 12.0):
-        key = api_key or os.getenv("ALPHAVANTAGE_API_KEY") or os.getenv("ALPHA_VANTAGE_API_KEY")
+        from alpha_vantage.timeseries import TimeSeries
+        from alpha_vantage.fundamentaldata import FundamentalData
+
+        key = api_key or os.getenv("ALPHAVANTAGE_API_KEY")
         if not key:
             raise RuntimeError("Alpha Vantage API key not set (ALPHAVANTAGE_API_KEY).")
-
-        try:
-            from alpha_vantage.timeseries import TimeSeries
-            from alpha_vantage.fundamentaldata import FundamentalData
-        except Exception as e:
-            raise ImportError("alpha_vantage not installed. pip install alpha-vantage") from e
-
         self._ts = TimeSeries(key=key, output_format="json")
         self._fd = FundamentalData(key=key, output_format="json")
         self._pause_s = float(pause_s)
 
-    def _sleep(self) -> None:
+    def _sleep(self):
         time.sleep(self._pause_s)
 
     def get_spot(self, symbol: str) -> float:
-        # Prefer quote; fallback to latest daily close.
         try:
             data, _ = self._ts.get_quote_endpoint(symbol=symbol)
             px = data.get("05. price")
@@ -76,26 +91,23 @@ class AlphaVantageDataSource(MarketDataSource):
         if len(pairs) < 2:
             raise RuntimeError(f"Alpha Vantage: insufficient closes for {symbol}")
 
-        pairs.sort(key=lambda x: x[0])
-        closes = [c for _, c in pairs][-need:]
-        return closes
+        pairs.sort(key=lambda p: p[0])
+        closes = [c for _, c in pairs]
+        return closes[-need:]
 
     @lru_cache(maxsize=256)
     def get_dividend_yield(self, symbol: str) -> Optional[float]:
-        data, _ = self._fd.get_company_overview(symbol=symbol)
-        payload = data if isinstance(data, dict) else {}
-        y = payload.get("DividendYield")
         try:
-            return float(y) if y not in (None, "None", "") else None
+            data, _ = self._fd.get_company_overview(symbol=symbol)
         except Exception:
             return None
+        payload = data if isinstance(data, dict) else {}
+        raw = payload.get("DividendYield")
+        y = _normalize_dividend_yield(raw)
+        return y
 
 
 class TwelveDataDataSource(MarketDataSource):
-    """
-    TwelveData REST via requests.
-    """
-
     BASE = "https://api.twelvedata.com"
 
     def __init__(self, api_key: Optional[str] = None, pause_s: float = 1.0):
@@ -134,7 +146,15 @@ class TwelveDataDataSource(MarketDataSource):
             raise RuntimeError(f"TwelveData: could not resolve spot for {symbol}")
 
     def get_daily_closes(self, symbol: str, need: int = 252) -> List[float]:
-        d = self._get("/time_series", {"symbol": symbol, "interval": "1day", "outputsize": max(need, 100), "order": "asc"})
+        d = self._get(
+            "/time_series",
+            {
+                "symbol": symbol,
+                "interval": "1day",
+                "outputsize": max(need, 100),
+                "order": "asc",
+            },
+        )
         values = d.get("values") or []
         closes: List[float] = []
         for row in values:
@@ -148,47 +168,44 @@ class TwelveDataDataSource(MarketDataSource):
             raise RuntimeError(f"TwelveData: insufficient closes for {symbol}")
         return closes[-need:]
 
+    @lru_cache(maxsize=256)
+    def get_dividend_yield(self, symbol: str) -> Optional[float]:
+        try:
+            f = self._get("/fundamentals", {"symbol": symbol}) or {}
+        except requests.HTTPError:
+            return None
+        except Exception:
+            return None
 
-@lru_cache(maxsize=256)
-def get_dividend_yield(self, symbol: str) -> Optional[float]:
-
-    try:
-        f = self._get("/fundamentals", {"symbol": symbol}) or {}
-    except requests.HTTPError:
-        # e.g. 404 /fundamentals or not in your plan
-        return None
-    except Exception:
-        # any other network/parse issue
-        return None
-
-    for c in (
+        for c in (
             f.get("dividend_yield"),
             (f.get("summary") or {}).get("dividend_yield"),
             (f.get("valuation") or {}).get("dividend_yield"),
-    ):
-        if c is None:
-            continue
-        try:
-            return float(c)
-        except Exception:
-            # sometimes it’s a non-numeric string
-            continue
+        ):
+            if c is None:
+                continue
+            y = _normalize_dividend_yield(c)
+            if y is not None:
+                return y
 
-    return None
+        return None
+
 
 class YFinanceDataSource(MarketDataSource):
-    """yfinance fallback."""
-
     def __init__(self):
         try:
-            import yfinance as yf  # type: ignore
+            import yfinance as yf
         except Exception as e:
-            raise RuntimeError("yfinance not installed") from e
+            raise RuntimeError("yfinance is required for YFinanceDataSource") from e
         self._yf = yf
 
     def get_spot(self, symbol: str) -> float:
         t = self._yf.Ticker(symbol)
-        px = t.fast_info.last_price if hasattr(t, "fast_info") else None
+        px = None
+        try:
+            px = float(t.fast_info["last_price"])
+        except Exception:
+            pass
         if px is None:
             info = t.info or {}
             px = info.get("regularMarketPrice")
@@ -203,7 +220,7 @@ class YFinanceDataSource(MarketDataSource):
     def get_daily_closes(self, symbol: str, need: int = 252) -> List[float]:
         t = self._yf.Ticker(symbol)
         hist = t.history(period="max")
-        closes = hist["Close"].dropna().to_list()
+        closes = hist["Close"].dropna().tolist()
         if len(closes) < 2:
             raise RuntimeError(f"yfinance: insufficient closes for {symbol}")
         return closes[-need:]
@@ -211,19 +228,12 @@ class YFinanceDataSource(MarketDataSource):
     def get_dividend_yield(self, symbol: str) -> Optional[float]:
         t = self._yf.Ticker(symbol)
         info = t.info or {}
-        y = info.get("dividendYield")
-        try:
-            return float(y) if y is not None else None
-        except Exception:
-            return None
+        raw = info.get("dividendYield")
+        y = _normalize_dividend_yield(raw)
+        return y
 
 
 class CombinedDataSource(MarketDataSource):
-    """
-    Try Alpha Vantage → TwelveData → yfinance in order.
-    Use at least one configured source.
-    """
-
     def __init__(self):
         self._sources: List[MarketDataSource] = []
         try:
@@ -239,9 +249,7 @@ class CombinedDataSource(MarketDataSource):
         except Exception:
             pass
         if not self._sources:
-            raise RuntimeError(
-                "No data sources available. Set ALPHAVANTAGE_API_KEY or TWELVEDATA_API_KEY, or install yfinance."
-            )
+            raise RuntimeError("No data sources available.")
 
     def _first_ok(self, fn_name: str, *args, **kwargs):
         last_err = None
@@ -260,4 +268,18 @@ class CombinedDataSource(MarketDataSource):
         return self._first_ok("get_daily_closes", symbol, need)
 
     def get_dividend_yield(self, symbol: str) -> Optional[float]:
-        return self._first_ok("get_dividend_yield", symbol)
+        last_err: Optional[Exception] = None
+        for src in self._sources:
+            fn = getattr(src, "get_dividend_yield", None)
+            if fn is None:
+                continue
+            try:
+                y = fn(symbol)
+                if y is not None:
+                    return y
+            except Exception as e:
+                last_err = e
+                continue
+        if last_err is not None:
+            raise last_err
+        return None
