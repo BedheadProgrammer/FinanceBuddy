@@ -1,0 +1,157 @@
+# FinanceBuddy
+
+FinanceBuddy is a full-stack educational options platform that helps students and new traders understand how options pricing and risk actually work in practice.
+
+It provides:
+
+- European and American option pricing with live market data
+- Full Black–Scholes fair value calculation and Greeks (Δ, Γ, Θ, Vega, ρ)
+- A Greeks visualization page for “what does this sensitivity really mean?”
+- A built-in “FinanceBud” AI assistant that explains each run in plain English
+- Modular data-source and calculator architecture for future extensions
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Directory Layout](#directory-layout)
+- [Getting Started](#getting-started)
+  - [Backend Setup (Django)](#backend-setup-django)
+  - [Frontend Setup (React  Typescript)](#frontend-setup-react--typescript)
+- [Environment Variables](#environment-variables)
+- [Core Flows](#core-flows)
+  - [European Option Pricing](#european-option-pricing)
+  - [American Option Pricing](#american-option-pricing)
+  - [Greeks Visualization](#greeks-visualization)
+  - [FinanceBud Assistant](#financebud-assistant)
+- [Development Notes](#development-notes)
+- [Roadmap / Future Work](#roadmap--future-work)
+- [License](#license)
+
+---
+
+## Features
+
+### 1. European Option Calculator
+
+- Prices European calls and puts using Black–Scholes–Merton.
+- Pulls:
+  - Live spot prices from combined market data sources.
+  - Risk-free rate from settings or environment.
+  - Dividend yield from fundamentals APIs (Alpha Vantage / TwelveData / yfinance).
+  - Historical or implied volatility, with an optional constant volatility override.
+- Returns:
+  - Fair value
+  - Delta, Gamma, Theta, Vega, Rho
+- Exposes a clean JSON API and a React UI with form inputs for:
+  - Symbol, side (CALL/PUT), strike, expiration
+  - Volatility mode: historical vs implied (match market option price)
+  - Constant σ override
+  - Use QuantLib day-count toggle
+
+### 2. American Option Calculator
+
+- Prices American options using a Barone–Adesi–Whaley (BAW) approximation.
+- Uses the same underlying variables as the European calculator: `S, K, r, q, sigma, T`.
+- Returns:
+  - American option price
+  - The equivalent European price
+  - Early-exercise premium
+  - Critical price / early-exercise boundary when applicable
+
+### 3. Greeks Visualization Page
+
+- Separate React route that consumes the last European pricing run.
+- Displays:
+  - Contract summary (symbol, side, strike, expiry, fair value, as-of date)
+  - Delta, Gamma, Theta, Vega, Rho in a clean “metric card” layout.
+- Can be reached from the European calculator via “View Greeks chart”.
+
+### 4. FinanceBud AI Assistant
+
+- Backend endpoints:
+  - `/api/assistant/euro/`
+  - `/api/assistant/american/`
+- Takes a structured “snapshot” of the last option pricing run:
+  - Inputs block (S, K, r, q, sigma, T, symbol, side, as_of, expiry)
+  - Results block (fair value and Greeks for European; price and premium for American)
+- Uses OpenAI’s Responses API to generate plain-English explanations:
+  - What the fair value means
+  - What each Greek / sensitivity represents
+  - Intuition around risk, time decay, and early exercise
+- Frontend UI:
+  - “Ask FinanceBud” button toggles a chat panel bound to the last run.
+  - Conversation history is maintained in component state and posted back as `messages`.
+
+---
+
+## Architecture
+
+FinanceBuddy is intentionally modular and calculator-driven.
+
+### Backend (Django)
+
+- Django project with dedicated apps for:
+  - `eurocalc` – European pricing, Greeks, BAW primitives.
+  - `american` (or shared in `eurocalc`) – American pricing via BAW.
+  - `api` – Lightweight API facade:
+    - `/api/prices`
+    - `/api/euro/price/`
+    - `/api/american/price/`
+    - `/api/assistant/euro/`
+    - `/api/assistant/american/`
+- Calculation pipeline is decomposed into small components:
+  - `SpotPriceCalculator`
+  - `RiskFreeRateCalculator`
+  - `FundamentalsDividendYieldCalculator`
+  - `HistoricalVolatilityCalculator` / `ConstantVolatilityCalculator` / `ImpliedVolatilityCalculator`
+  - `YearFractionCalculator`
+  - `GreeksCalculator`
+  - `BAWAmericanOptionCalculator`
+  - `VariablesAssembler` to tie them together
+
+### Market Data Layer
+
+- `data_sources.py` defines a `MarketDataSource` interface and three implementations:
+  - `AlphaVantageDataSource`
+  - `TwelveDataDataSource`
+  - `YFinanceDataSource`
+- `CombinedDataSource` tries each provider in turn and returns the first successful result.
+- Dividend yield (`q`) is carefully normalized so it matches typical annualized percentage yields from each upstream provider.
+
+### Frontend (React + TypeScript + MUI)
+
+- React SPA with React Router.
+- Protected routes for tools (Euro, American, Greeks visualization, Assistant).
+- Key screens:
+  - `/tools/euro` – European option calculator.
+  - `/tools/american` – American option calculator.
+  - `/tools/euro/greeks` – Greeks visualization page.
+  - `/assistant` or integrated chat panels – FinanceBud assistant.
+- Uses Material UI components plus custom styling for a dashboard-like feel.
+
+---
+
+## Tech Stack
+
+**Backend**
+
+- Python 3.x
+- Django
+- QuantLib (for IV solving and optional day-count)
+- Requests, Alpha Vantage SDK, TwelveData, yfinance
+- OpenAI Python SDK
+- PostgreSQL (recommended) or SQLite for development
+
+**Frontend**
+
+- React
+- TypeScript
+- Vite or CRA (depending on project configuration)
+- Material UI
+- React Router
+
+---

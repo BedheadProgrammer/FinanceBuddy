@@ -1,4 +1,3 @@
-// FinanceSt/frontend/src/pages/AmericanOptionsPricing.tsx
 import React, { useMemo, useState } from "react";
 import {
   Box,

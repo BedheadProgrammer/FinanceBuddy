@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: optionstrdr-db
+    restart: unless-stopped
+    env_file:
+      - .dockerenv
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db_seed.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
+
+volumes:
+  db_data:

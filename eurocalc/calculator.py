@@ -6,14 +6,10 @@ from datetime import date
 import math
 import os
 
-# Requires data_sources.py in the same package
 from .data_sources import MarketDataSource, CombinedDataSource
 
 
-# ---------------- Spot ----------------
-
 class SpotPriceCalculator:
-
     def __init__(
         self,
         market_ticker_func: Optional[Callable[[str], float]] = None,
@@ -31,12 +27,7 @@ class SpotPriceCalculator:
         return float(self.ds.get_spot(symbol))
 
 
-
-
 class RiskFreeRateCalculator:
-    """
-    Pull scalar r from Django settings.RISK_FREE_RATE or ENV RISK_FREE_RATE.
-    """
     def __init__(self, env_key: str = "RISK_FREE_RATE", default: float = 0.045):
         self.env_key = env_key
         self.default = float(default)
@@ -53,10 +44,7 @@ class RiskFreeRateCalculator:
         return float(val)
 
 
-# ----------------      Dividend         -----------------
-
 class FundamentalsDividendYieldCalculator:
-    """Dividend/carry yield from MarketDataSource; returns default if missing."""
     def __init__(self, data_source: Optional[MarketDataSource] = None, default_if_missing: float = 0.0):
         self.ds = data_source or CombinedDataSource()
         self._default = float(default_if_missing)
@@ -70,7 +58,6 @@ class FundamentalsDividendYieldCalculator:
 
 
 class ConstantDividendYieldCalculator:
-    """Fixed carry/dividend yield (useful for tests or non-dividend underlyings)."""
     def __init__(self, q: float = 0.0):
         self.q = float(q)
 
@@ -78,13 +65,7 @@ class ConstantDividendYieldCalculator:
         return self.q
 
 
-# ---------------- Historical volatility σ ----------------
-
 class HistoricalVolatilityCalculator:
-    """
-    Realized volatility from daily close-to-close log returns, annualized by sqrt(252).
-    Data source must return ascending closes (oldest → newest).
-    """
     def __init__(
         self,
         data_source: Optional[MarketDataSource] = None,
@@ -105,7 +86,7 @@ class HistoricalVolatilityCalculator:
             if a > 0 and b > 0:
                 rets.append(math.log(b / a))
         if len(rets) < 10:
-            return 0.20  # conservative default for short series
+            return 0.20
         m = sum(rets) / len(rets)
         var = sum((r - m) ** 2 for r in rets) / (len(rets) - 1)
         sigma = math.sqrt(var) * math.sqrt(252.0)
@@ -113,7 +94,6 @@ class HistoricalVolatilityCalculator:
 
 
 class ConstantVolatilityCalculator:
-    """Fixed σ (for tests/overrides)."""
     def __init__(self, sigma: float):
         if sigma <= 0:
             raise ValueError("sigma must be > 0")
@@ -123,15 +103,9 @@ class ConstantVolatilityCalculator:
         return self.sigma
 
 
-# ---------------- Implied volatility σ (QuantLib) ----------------
-
 class ImpliedVolatilityCalculator:
-    """
-    Solve implied σ via QuantLib given a market option price.
-    Inputs are primitives; style is European (analytic engine).
-    """
     def __init__(self, calendar=None, day_count=None):
-        import QuantLib as ql  # imported here to avoid hard dependency for other flows
+        import QuantLib as ql
         self.ql = ql
         self.calendar = calendar or ql.UnitedStates(Calendar)
         self.day_count = day_count or ql.Actual365Fixed()
@@ -141,7 +115,7 @@ class ImpliedVolatilityCalculator:
         *,
         market_price: float,
         symbol: str,
-        side: str,          # "CALL" or "PUT"
+        side: str,
         strike: float,
         expiry: date,
         as_of: Optional[date],
@@ -169,7 +143,8 @@ class ImpliedVolatilityCalculator:
         process = ql.BlackScholesMertonProcess(S, div, rf, vol_h)
 
         payoff = ql.PlainVanillaPayoff(
-            ql.Option.Call if side.upper() == "CALL" else ql.Option.Put, float(strike)
+            ql.Option.Call if side.upper() == "CALL" else ql.Option.Put,
+            float(strike),
         )
         ex = ql.EuropeanExercise(ql.Date(expiry.day, expiry.month, expiry.year))
         opt = ql.VanillaOption(payoff, ex)
@@ -182,14 +157,11 @@ class ImpliedVolatilityCalculator:
         return float(max(min_vol, iv))
 
 
-# ---------------- Time to expiry T (year fraction) ----------------
-
 class YearFractionCalculator:
-
     def __init__(self, use_quantlib: bool = False):
         self.use_quantlib = use_quantlib
         if use_quantlib:
-            import QuantLib as ql  # optional
+            import QuantLib as ql
             self._ql = ql
             self._dc = ql.Actual365Fixed()
 
@@ -204,16 +176,15 @@ class YearFractionCalculator:
         return float(self._dc.yearFraction(d1, d2))
 
 
-# ---------------- d1, d2 + Greeks (closed form) ----------------
-
-def _phi(x: float) -> float:  # standard normal pdf
+def _phi(x: float) -> float:
     return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
 
-def _N(x: float) -> float:    # standard normal cdf
+
+def _N(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
-class D1D2Calculator:
 
+class D1D2Calculator:
     def compute(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> tuple[float, float]:
         if S <= 0 or K <= 0 or sigma <= 0 or T <= 0:
             raise ValueError("S, K, sigma, T must be positive.")
@@ -223,8 +194,8 @@ class D1D2Calculator:
         d2 = d1 - sigma * math.sqrt(T)
         return d1, d2
 
-class GreeksCalculator:
 
+class GreeksCalculator:
     def compute(self, S: float, K: float, r: float, q: float, sigma: float, T: float, side: str) -> dict:
         side_u = side.upper()
         d1, d2 = D1D2Calculator().compute(S, K, r, q, sigma, T)
@@ -234,18 +205,26 @@ class GreeksCalculator:
         disc_q = math.exp(-q * T)
 
         if side_u == "CALL":
-            fair  = S * disc_q * Nd1 - K * disc_r * Nd2
+            fair = S * disc_q * Nd1 - K * disc_r * Nd2
             delta = disc_q * Nd1
-            theta = -(S * disc_q * nd1 * sigma) / (2.0 * math.sqrt(T)) - r * K * disc_r * Nd2 + q * S * disc_q * Nd1
-            rho   = K * T * disc_r * Nd2
+            theta = (
+                -(S * disc_q * nd1 * sigma) / (2.0 * math.sqrt(T))
+                - r * K * disc_r * Nd2
+                + q * S * disc_q * Nd1
+            )
+            rho = K * T * disc_r * Nd2
         else:
-            fair  = K * disc_r * _N(-d2) - S * disc_q * _N(-d1)
+            fair = K * disc_r * _N(-d2) - S * disc_q * _N(-d1)
             delta = -disc_q * _N(-d1)
-            theta = -(S * disc_q * nd1 * sigma) / (2.0 * math.sqrt(T)) + r * K * disc_r * _N(-d2) - q * S * disc_q * _N(-d1)
-            rho   = -K * T * disc_r * _N(-d2)
+            theta = (
+                -(S * disc_q * nd1 * sigma) / (2.0 * math.sqrt(T))
+                + r * K * disc_r * _N(-d2)
+                - q * S * disc_q * _N(-d1)
+            )
+            rho = -K * T * disc_r * _N(-d2)
 
         gamma = (disc_q * nd1) / (S * sigma * math.sqrt(T))
-        vega  = S * disc_q * nd1 * math.sqrt(T)
+        vega = S * disc_q * nd1 * math.sqrt(T)
 
         return {
             "fair_value": fair,
@@ -257,112 +236,85 @@ class GreeksCalculator:
         }
 
 
-# ---------------- American option pricing (Barone-Adesi-Whaley) ----------------
-
 class BAWAmericanOptionCalculator:
-    """
-    Barone-Adesi-Whaley (1987) approximation for American option pricing.
-    Fast analytical approximation for American calls and puts with continuous dividends.
-    
-    Reference: Barone-Adesi, G., & Whaley, R. E. (1987). 
-    "Efficient Analytic Approximation of American Option Values"
-    Journal of Finance, 42(2), 301-320.
-    """
-    
     def __init__(self, max_iterations: int = 100, tolerance: float = 1e-6):
         self.max_iterations = max_iterations
         self.tolerance = tolerance
-    
+
     def compute(self, S: float, K: float, r: float, q: float, sigma: float, T: float, side: str) -> dict:
-        """
-        Calculate American option price
-        
-        Ins
-            S: Current spot price
-            K: Strike price
-            r: Risk-free rate (continuous)
-            q: Dividend yield (continuous)
-            sigma: Volatility (annualized)
-            T: Time to expiry (years)
-            side: "CALL" or "PUT"
-        
-        Returns:
-            dict with:
-                - american_price: American option value
-                - european_price: European option value (for comparison)
-                - early_exercise_premium: american_price - european_price
-                - critical_price: Optimal early exercise boundary (S*)
-        """
         if S <= 0 or K <= 0 or sigma <= 0 or T <= 0:
             raise ValueError("S, K, sigma, T must be positive.")
-        
+
         side_u = side.upper()
         if side_u not in ("CALL", "PUT"):
             raise ValueError("side must be 'CALL' or 'PUT'")
-        
 
         euro_calc = GreeksCalculator()
         euro_result = euro_calc.compute(S, K, r, q, sigma, T, side_u)
         european_price = euro_result["fair_value"]
-        
 
         if side_u == "CALL":
-
             if q <= 1e-10:
                 return {
                     "american_price": european_price,
                     "european_price": european_price,
                     "early_exercise_premium": 0.0,
-                    "critical_price": None,  # Never optimal to exercise early
+                    "critical_price": None,
                 }
-            
-
             intrinsic = max(S - K, 0)
-            if T < 1e-10:  # At expiry
+            if T < 1e-10:
                 return {
                     "american_price": intrinsic,
                     "european_price": european_price,
                     "early_exercise_premium": intrinsic - european_price,
                     "critical_price": K,
                 }
-            
             american_price, critical_price = self._baw_call(S, K, r, q, sigma, T)
-        
         else:
-
             intrinsic = max(K - S, 0)
-            if T < 1e-10:  # At expiry
+            if T < 1e-10:
                 return {
                     "american_price": intrinsic,
                     "european_price": european_price,
                     "early_exercise_premium": intrinsic - european_price,
                     "critical_price": K,
                 }
-            
             american_price, critical_price = self._baw_put(S, K, r, q, sigma, T)
-        
+
         early_exercise_premium = american_price - european_price
-        
+
+        eps_abs = abs(early_exercise_premium)
+        eps_thresh = max(1e-4, 1e-6 * max(1.0, abs(european_price)))
+        invalid_boundary = (
+            critical_price is None
+            or not math.isfinite(critical_price)
+            or critical_price <= 0.0
+        )
+
+        if (
+            invalid_boundary
+            or eps_abs < eps_thresh
+            or early_exercise_premium < 0.0
+        ):
+            american_price = european_price
+            early_exercise_premium = 0.0
+            critical_price = None
+
         return {
             "american_price": american_price,
             "european_price": european_price,
             "early_exercise_premium": early_exercise_premium,
             "critical_price": critical_price,
         }
-    
+
     def _baw_call(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> tuple[float, float]:
-
-
         M = 2.0 * r / (sigma * sigma)
         N = 2.0 * (r - q) / (sigma * sigma)
         K_factor = 1.0 - math.exp(-r * T)
-        
 
-        q2 = 0.5 * (-(N - 1) + math.sqrt((N - 1) ** 2 + 4.0 * M / K_factor))
-        
+        q2 = 0.5 * (-(N - 1.0) + math.sqrt((N - 1.0) * (N - 1.0) + 4.0 * M / K_factor))
 
         S_star_seed = K + (K / (q2 - 1.0)) * (1.0 - math.exp(-q * T) * _N(self._d1(K, K, r, q, sigma, T)))
-        
 
         S_star = S_star_seed
         for _ in range(self.max_iterations):
@@ -370,38 +322,30 @@ class BAWAmericanOptionCalculator:
             LHS = S_star - K
             RHS = self._european_call(S_star, K, r, q, sigma, T) + (1.0 - math.exp(-q * T) * _N(d1)) * S_star / q2
             diff = LHS - RHS
-            
             if abs(diff) < self.tolerance:
                 break
-            
-
-            d_diff = (1.0 - math.exp(-q * T) * _N(d1)) * (1.0 - 1.0 / q2) + math.exp(-q * T) * _phi(d1) / (sigma * math.sqrt(T))
+            d_diff = (
+                (1.0 - math.exp(-q * T) * _N(d1)) * (1.0 - 1.0 / q2)
+                + math.exp(-q * T) * _phi(d1) / (sigma * math.sqrt(T))
+            )
             S_star = S_star - diff / d_diff
-        
 
         if S < S_star:
-
             A2 = (S_star / q2) * (1.0 - math.exp(-q * T) * _N(self._d1(S_star, K, r, q, sigma, T)))
             american_call = self._european_call(S, K, r, q, sigma, T) + A2 * (S / S_star) ** q2
         else:
-
             american_call = S - K
-        
-        return american_call, S_star
-    
-    def _baw_put(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> tuple[float, float]:
-        """ approximation for American put."""
 
+        return american_call, S_star
+
+    def _baw_put(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> tuple[float, float]:
         M = 2.0 * r / (sigma * sigma)
         N = 2.0 * (r - q) / (sigma * sigma)
         K_factor = 1.0 - math.exp(-r * T)
-        
 
-        q1 = 0.5 * (-(N - 1) - math.sqrt((N - 1) ** 2 + 4.0 * M / K_factor))
-        
+        q1 = 0.5 * (-(N - 1.0) - math.sqrt((N - 1.0) * (N - 1.0) + 4.0 * M / K_factor))
 
         S_star_seed = K - (K / (1.0 - q1)) * (1.0 - math.exp(-q * T) * _N(-self._d1(K, K, r, q, sigma, T)))
-        
 
         S_star = S_star_seed
         for _ in range(self.max_iterations):
@@ -409,52 +353,43 @@ class BAWAmericanOptionCalculator:
             LHS = K - S_star
             RHS = self._european_put(S_star, K, r, q, sigma, T) - (1.0 - math.exp(-q * T) * _N(-d1)) * S_star / q1
             diff = LHS - RHS
-            
             if abs(diff) < self.tolerance:
                 break
-            
-
-            d_diff = -(1.0 - math.exp(-q * T) * _N(-d1)) * (1.0 - 1.0 / q1) - math.exp(-q * T) * _phi(d1) / (sigma * math.sqrt(T))
+            d_diff = (
+                -(1.0 - math.exp(-q * T) * _N(-d1)) * (1.0 - 1.0 / q1)
+                - math.exp(-q * T) * _phi(d1) / (sigma * math.sqrt(T))
+            )
             S_star = S_star - diff / d_diff
-        
 
         if S > S_star:
-
             A1 = -(S_star / q1) * (1.0 - math.exp(-q * T) * _N(-self._d1(S_star, K, r, q, sigma, T)))
             american_put = self._european_put(S, K, r, q, sigma, T) + A1 * (S / S_star) ** q1
         else:
-
             american_put = K - S
-        
+
         return american_put, S_star
-    
+
     def _d1(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> float:
         return (math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
-    
+
     def _european_call(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> float:
         d1 = self._d1(S, K, r, q, sigma, T)
         d2 = d1 - sigma * math.sqrt(T)
         return S * math.exp(-q * T) * _N(d1) - K * math.exp(-r * T) * _N(d2)
-    
+
     def _european_put(self, S: float, K: float, r: float, q: float, sigma: float, T: float) -> float:
         d1 = self._d1(S, K, r, q, sigma, T)
         d2 = d1 - sigma * math.sqrt(T)
         return K * math.exp(-r * T) * _N(-d2) - S * math.exp(-q * T) * _N(-d1)
 
 
-
-
 class VariablesAssembler:
-    """
-    Builds all variables needed by Black–Scholes pricers and greeks using the calculators.
-    Accepts primitives; no external domain types required.
-    """
     def __init__(
         self,
         spot_calc: SpotPriceCalculator,
         rate_calc: RiskFreeRateCalculator,
-        div_calc,  # FundamentalsDividendYieldCalculator | ConstantDividendYieldCalculator
-        vol_calc,  # HistoricalVolatilityCalculator | ConstantVolatilityCalculator | ImpliedVolatilityCalculator
+        div_calc,
+        vol_calc,
         T_calc: YearFractionCalculator,
     ):
         self.spot_calc = spot_calc
@@ -467,11 +402,11 @@ class VariablesAssembler:
         self,
         *,
         symbol: str,
-        side: str,            # "CALL" or "PUT"
+        side: str,
         strike: float,
         expiry: date,
         as_of: Optional[date] = None,
-        market_option_price: Optional[float] = None,  # required when using ImpliedVolatilityCalculator
+        market_option_price: Optional[float] = None,
     ) -> dict:
         side_u = side.upper()
         if side_u not in ("CALL", "PUT"):
@@ -515,5 +450,4 @@ class VariablesAssembler:
             "symbol": symbol,
             "as_of": as_of_eff,
             "expiry": expiry,
-
-       }
+        }
