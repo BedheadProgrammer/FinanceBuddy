@@ -4,7 +4,32 @@ from functools import lru_cache
 from datetime import datetime
 import os
 import time
+import math
 import requests
+
+
+def _normalize_dividend_yield(value: Optional[float]) -> Optional[float]:
+    try:
+        y = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(y):
+        return None
+    if y <= 0:
+        return None
+    if y < 1e-6:
+        return None
+    if y <= 0.25:
+        y_norm = y
+    elif y <= 25.0:
+        y_norm = y / 100.0
+    elif y <= 100.0:
+        y_norm = y / 100.0
+    else:
+        return None
+    if y_norm > 0.25:
+        y_norm = 0.25
+    return y_norm
 
 
 class MarketDataSource:
@@ -77,11 +102,9 @@ class AlphaVantageDataSource(MarketDataSource):
         except Exception:
             return None
         payload = data if isinstance(data, dict) else {}
-        y = payload.get("DividendYield")
-        try:
-            return float(y) if y not in (None, "None", "") else None
-        except Exception:
-            return None
+        raw = payload.get("DividendYield")
+        y = _normalize_dividend_yield(raw)
+        return y
 
 
 class TwelveDataDataSource(MarketDataSource):
@@ -161,10 +184,9 @@ class TwelveDataDataSource(MarketDataSource):
         ):
             if c is None:
                 continue
-            try:
-                return float(c)
-            except Exception:
-                continue
+            y = _normalize_dividend_yield(c)
+            if y is not None:
+                return y
 
         return None
 
@@ -206,11 +228,9 @@ class YFinanceDataSource(MarketDataSource):
     def get_dividend_yield(self, symbol: str) -> Optional[float]:
         t = self._yf.Ticker(symbol)
         info = t.info or {}
-        y = info.get("dividendYield")
-        try:
-            return float(y) if y is not None else None
-        except Exception:
-            return None
+        raw = info.get("dividendYield")
+        y = _normalize_dividend_yield(raw)
+        return y
 
 
 class CombinedDataSource(MarketDataSource):
@@ -256,7 +276,7 @@ class CombinedDataSource(MarketDataSource):
             try:
                 y = fn(symbol)
                 if y is not None:
-                    return float(y)
+                    return y
             except Exception as e:
                 last_err = e
                 continue

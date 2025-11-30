@@ -65,7 +65,7 @@ def euro_price_api(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
-    out = {"inputs": vars_, "greeks": greeks}
+    out = {"inputs": vars_, "price_and_greeks": greeks}
     if isinstance(out["inputs"].get("as_of"), date):
         out["inputs"]["as_of"] = out["inputs"]["as_of"].isoformat()
     if isinstance(out["inputs"].get("expiry"), date):

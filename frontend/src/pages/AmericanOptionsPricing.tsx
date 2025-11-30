@@ -27,6 +27,8 @@ type AmericanResult = {
 };
 type AmericanApiResponse = { inputs: Inputs; american_result: AmericanResult } | { error: string };
 
+type AssistantMessage = { id: number; role: "user" | "assistant"; content: string };
+
 export default function AmericanOptionsPricing() {
   usePageMeta("American Option Calculator | FinanceBuddy", "American option calculator");
 
@@ -34,14 +36,114 @@ export default function AmericanOptionsPricing() {
   const [symbol, setSymbol] = useState("AAPL");
   const [side, setSide] = useState<"CALL"|"PUT">("CALL");
   const [strike, setStrike] = useState("200");
-  const [expiry, setExpiry] = useState("2026-01-17");
-  const [volMode, setVolMode] = useState<"HIST"|"IV">("HIST");
+  const [expiry, setExpiry] = useState("2026-01-16");
+  const [volMode, setVolMode] = useState<"HIST"|"IV"|"CONST">("HIST");
   const [marketOptionPrice, setMarketOptionPrice] = useState("");
   const [constantVol, setConstantVol] = useState("");
   const [useQL, setUseQL] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string|null>(null);
   const [data, setData] = useState<AmericanApiResponse|null>(null);
+
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantInput, setAssistantInput] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
+
+  function buildAssistantSnapshot() {
+    if (!data || (data as any).error || !(data as any).american_result) return null;
+    return {
+      inputs: (data as any).inputs,
+      american_result: (data as any).american_result,
+    };
+  }
+
+  async function handleOpenAssistant() {
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+    setAssistantError(null);
+    setAssistantOpen(true);
+    if (assistantMessages.length > 0) return;
+
+    setAssistantLoading(true);
+    try {
+      const resp = await fetch("/api/assistant/american/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          message:
+            "Explain this American option pricing result in simple terms, including what the prices, premium, and early exercise behavior mean for the trader.",
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else {
+        setAssistantMessages([
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: (json as any).reply ?? "",
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  async function handleSendAssistantMessage(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = assistantInput.trim();
+    if (!trimmed) return;
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+
+    const newUserMessage: AssistantMessage = {
+      id: Date.now(),
+      role: "user",
+      content: trimmed,
+    };
+    const history = [...assistantMessages, newUserMessage];
+    setAssistantMessages(history);
+    setAssistantInput("");
+    setAssistantLoading(true);
+    setAssistantError(null);
+
+    try {
+      const resp = await fetch("/api/assistant/american/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          messages: history.map(m => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else if ((json as any).reply) {
+        setAssistantMessages(prev => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            role: "assistant",
+            content: (json as any).reply,
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,13 +163,13 @@ export default function AmericanOptionsPricing() {
       });
       const json = await res.json();
       if (!res.ok || (json as any).error) {
-        setError((json as any).error || `HTTP ${res.status}`);
+        setError((json as any).error || "Something went wrong");
         setData(null);
       } else {
         setData(json as AmericanApiResponse);
       }
     } catch (err: any) {
-      setError(err?.message || String(err));
+      setError(err?.message || "Something went wrong");
       setData(null);
     } finally {
       setLoading(false);
@@ -75,162 +177,162 @@ export default function AmericanOptionsPricing() {
   }
 
   return (
-    <Box
-      sx={{
-        minHeight: "calc(100vh - 120px)",
-        display: "flex",
-        alignItems: "center",
-        py: 4,
-      }}
-    >
+    <Box sx={{ py: 6 }}>
       <Container maxWidth="lg">
-        <Box sx={{ mb: 4, textAlign: "center" }}>
-          <Typography variant="h3" fontWeight={700} sx={{ mb: 1 }}>
-            American Option Calculator
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3} justifyContent="center">
+        <Grid container spacing={4}>
           <Grid item xs={12} md={5}>
             <Paper
-              elevation={3}
               sx={{
-                p: 4,
+                p: 3,
                 borderRadius: 3,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "linear-gradient(160deg, #0f172a 0%, #020617 50%, #0f172a 100%)",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                background: "radial-gradient(circle at top left, #1e293b 0%, #020617 55%, #000 100%)",
+                border: "1px solid rgba(148,163,184,0.4)",
+                boxShadow: "0 18px 60px rgba(15,23,42,0.9)",
               }}
             >
-              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                Option setup
-              </Typography>
-              <Box component="form" onSubmit={handleSubmit}>
-                <Stack spacing={2.5}>
-                  <TextField
-                    label="Symbol"
-                    value={symbol}
-                    onChange={(e) => setSymbol(e.target.value)}
-                    size="small"
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <Box>
-                    <Typography variant="caption" sx={{ mb: 1, display: "block" }}>
-                      Side
-                    </Typography>
+              <Stack spacing={2.5}>
+                <Box>
+                  <Typography variant="overline" sx={{ letterSpacing: 2 }} color="primary.light">
+                    FinanceBud
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                    American option calculator
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Price an American call or put using the Barone-Adesi Whaley approximation with live
+                    market inputs.
+                  </Typography>
+                </Box>
+
+                <Box component="form" onSubmit={handleSubmit}>
+                  <Stack spacing={2}>
+                    <TextField
+                      label="Symbol"
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                      size="small"
+                      fullWidth
+                    />
+
                     <ToggleButtonGroup
+                      color="primary"
                       value={side}
                       exclusive
-                      onChange={(_, v) => v && setSide(v)}
+                      onChange={(_, next) => next && setSide(next)}
                       size="small"
-                      fullWidth
                     >
-                      <ToggleButton value="CALL">CALL</ToggleButton>
-                      <ToggleButton value="PUT">PUT</ToggleButton>
+                      <ToggleButton value="CALL">Call</ToggleButton>
+                      <ToggleButton value="PUT">Put</ToggleButton>
                     </ToggleButtonGroup>
-                  </Box>
-                  <Grid container spacing={1.5}>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Strike"
-                        value={strike}
-                        onChange={(e) => setStrike(e.target.value)}
-                        size="small"
-                        fullWidth
-                        InputLabelProps={{ shrink: true }}
-                      />
+
+                    <Grid container spacing={1.5}>
+                      <Grid item xs={6}>
+                        <TextField
+                          label="Strike"
+                          value={strike}
+                          onChange={(e) => setStrike(e.target.value)}
+                          size="small"
+                          fullWidth
+                          type="number"
+                          inputProps={{ step: "0.01" }}
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          label="Expiration"
+                          type="date"
+                          size="small"
+                          fullWidth
+                          value={expiry}
+                          onChange={(e) => setExpiry(e.target.value)}
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{ min: todayISO }}
+                        />
+                      </Grid>
                     </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        label="Expiration"
-                        type="date"
-                        value={expiry}
-                        inputProps={{ min: todayISO }}
-                        onChange={(e) => setExpiry(e.target.value)}
-                        size="small"
-                        fullWidth
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                  </Grid>
-                  <TextField
-                    select
-                    label="Volatility source"
-                    value={volMode}
-                    onChange={(e) => setVolMode(e.target.value as "HIST" | "IV")}
-                    size="small"
-                    fullWidth
-                  >
-                    <MenuItem value="HIST">Historical volatility</MenuItem>
-                    <MenuItem value="IV">Implied volatility (needs market price)</MenuItem>
-                  </TextField>
-                  {volMode === "IV" && (
+
                     <TextField
-                      label="Market option price"
-                      value={marketOptionPrice}
-                      onChange={(e) => setMarketOptionPrice(e.target.value)}
+                      select
+                      label="Volatility mode"
                       size="small"
                       fullWidth
-                      InputLabelProps={{ shrink: true }}
+                      value={volMode}
+                      onChange={(e) => setVolMode(e.target.value as any)}
+                    >
+                      <MenuItem value="HIST">Use historical volatility</MenuItem>
+                      <MenuItem value="IV">Match market option price (IV)</MenuItem>
+                      <MenuItem value="CONST">Use constant volatility</MenuItem>
+                    </TextField>
+
+                    {volMode === "IV" && (
+                      <TextField
+                        label="Market option price"
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={marketOptionPrice}
+                        onChange={(e) => setMarketOptionPrice(e.target.value)}
+                        InputProps={{ startAdornment: <span>$</span> as any }}
+                      />
+                    )}
+
+                    {volMode === "CONST" && (
+                      <TextField
+                        label="Constant volatility (σ)"
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={constantVol}
+                        onChange={(e) => setConstantVol(e.target.value)}
+                        InputProps={{ endAdornment: <span>%</span> as any }}
+                      />
+                    )}
+
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={useQL}
+                          onChange={(e) => setUseQL(e.target.checked)}
+                          size="small"
+                        />
+                      }
+                      label="Use QuantLib day count"
                     />
-                  )}
-                  <TextField
-                    label="Constant σ override (optional)"
-                    value={constantVol}
-                    onChange={(e) => setConstantVol(e.target.value)}
-                    size="small"
-                    fullWidth
-                    placeholder="e.g. 0.25"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <FormControlLabel
-                    control={<Switch checked={useQL} onChange={(e) => setUseQL(e.target.checked)} />}
-                    label="Use QuantLib day count"
-                  />
-                  {error && (
-                    <Typography
-                      variant="body2"
+
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="large"
+                      disabled={loading}
                       sx={{
-                        bgcolor: "rgba(248, 113, 113, 0.1)",
-                        border: "1px solid rgba(248, 113, 113, 0.4)",
-                        borderRadius: 2,
-                        p: 1.2,
-                        color: "#fecaca",
+                        mt: 1,
+                        borderRadius: 999,
+                        textTransform: "none",
+                        fontWeight: 600,
                       }}
                     >
-                      {error}
-                    </Typography>
-                  )}
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="large"
-                    disabled={loading}
-                    sx={{
-                      borderRadius: 2,
-                      textTransform: "none",
-                      py: 1.5,
-                      fontWeight: 600,
-                    }}
-                    fullWidth
-                  >
-                    {loading ? "Calculating…" : "Calculate price"}
-                  </Button>
-                </Stack>
-              </Box>
+                      {loading ? "Pricing..." : "Run American pricing"}
+                    </Button>
+
+                    {error && (
+                      <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                        {error}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              </Stack>
             </Paper>
           </Grid>
 
           <Grid item xs={12} md={7}>
             <Paper
-              elevation={2}
               sx={{
-                p: 4,
+                p: 3,
                 borderRadius: 3,
-                border: "1px solid rgba(255,255,255,0.05)",
-                backgroundColor: "rgba(2,6,23,0.4)",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+                background: "radial-gradient(circle at top, #020617 0%, #020617 55%, #000 100%)",
+                border: "1px solid rgba(148,163,184,0.4)",
+                minHeight: 260,
               }}
             >
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -247,6 +349,7 @@ export default function AmericanOptionsPricing() {
                   size="small"
                   disabled={!data || !(data as any).american_result}
                   sx={{ borderRadius: 999, textTransform: "none" }}
+                  onClick={handleOpenAssistant}
                 >
                   View details
                 </Button>
@@ -289,11 +392,14 @@ export default function AmericanOptionsPricing() {
                       <Typography variant="caption" color="text.secondary">
                         As of
                       </Typography>
-                      <Typography variant="body2">
-                        {new Date((data as any).inputs.as_of).toLocaleDateString()}
+                      <Typography
+                        variant="body2"
+                        sx={{ fontVariantNumeric: "tabular-nums", display: "block" }}
+                      >
+                        {(data as any).inputs.as_of}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Exp: {new Date((data as any).inputs.expiry).toLocaleDateString()}
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                        Exp: {(data as any).inputs.expiry}
                       </Typography>
                     </Box>
                   </Box>
@@ -334,19 +440,10 @@ export default function AmericanOptionsPricing() {
                           Critical price
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                        {(() => {
-                            const cp = (data as any).american_result
-                            .critical_price as number | null;
-
-                        if (cp == null || !Number.isFinite(cp)) {
-                        return "No finite boundary";
-    }
-
-    return cp.toFixed(6);
-  })()}
-</Typography>
-
-
+                          {(data as any).american_result.critical_price === null
+                            ? "N/A"
+                            : (data as any).american_result.critical_price.toFixed(4)}
+                        </Typography>
                       </Paper>
                     </Grid>
                     <Grid item xs={6} sm={3}>
@@ -358,11 +455,101 @@ export default function AmericanOptionsPricing() {
                           Strike
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {(data as any).inputs.K.toFixed ? (data as any).inputs.K.toFixed(2) : (data as any).inputs.K}
+                          {(data as any).inputs.K.toFixed
+                            ? (data as any).inputs.K.toFixed(2)
+                            : (data as any).inputs.K}
                         </Typography>
                       </Paper>
                     </Grid>
                   </Grid>
+
+                  {assistantOpen && (
+                    <Box
+                      sx={{
+                        mt: 3,
+                        p: 2,
+                        borderRadius: 2,
+                        border: "1px solid rgba(148,163,184,0.4)",
+                        backgroundColor: "rgba(15,23,42,0.6)",
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                        FinanceBud's explanation
+                      </Typography>
+                      {assistantError && (
+                        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                          {assistantError}
+                        </Typography>
+                      )}
+                      <Box
+                        sx={{
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          mb: 1.5,
+                          pr: 1,
+                        }}
+                      >
+                        {assistantMessages.length === 0 && !assistantLoading && !assistantError && (
+                          <Typography variant="body2" color="text.secondary">
+                            Click "View details" to ask FinanceBud about this American option run.
+                          </Typography>
+                        )}
+                        {assistantMessages.map((msg) => (
+                          <Box
+                            key={msg.id}
+                            sx={{
+                              mb: 1,
+                              textAlign: msg.role === "user" ? "right" : "left",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "inline-block",
+                                px: 1.5,
+                                py: 1,
+                                borderRadius: 2,
+                                backgroundColor:
+                                  msg.role === "user"
+                                    ? "rgba(59,130,246,0.3)"
+                                    : "rgba(15,23,42,0.9)",
+                              }}
+                            >
+                              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                                {msg.content}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                        {assistantLoading && (
+                          <Typography variant="body2" color="text.secondary">
+                            Thinking...
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box
+                        component="form"
+                        onSubmit={handleSendAssistantMessage}
+                        sx={{ display: "flex", gap: 1 }}
+                      >
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Ask a question about this result..."
+                          value={assistantInput}
+                          onChange={(e) => setAssistantInput(e.target.value)}
+                          disabled={assistantLoading}
+                          variant="outlined"
+                        />
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          disabled={assistantLoading || !assistantInput.trim()}
+                        >
+                          Send
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
               )}
             </Paper>

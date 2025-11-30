@@ -42,10 +42,15 @@ type EuroApiResponse = {
   error?: string;
 };
 
+type AssistantMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+};
+
 export default function EuroOptionsPricing() {
   const navigate = useNavigate();
 
-  // Keep metadata functional, not promotional
   usePageMeta("European Option Calculator | FinanceBuddy", "European option calculator");
 
   const [symbol, setSymbol] = useState("AAPL");
@@ -60,10 +65,20 @@ export default function EuroOptionsPricing() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantInput, setAssistantInput] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    setData(null);
+    setAssistantOpen(false);
+    setAssistantMessages([]);
+    setAssistantError(null);
 
     const params = new URLSearchParams({
       symbol: symbol.trim().toUpperCase(),
@@ -107,6 +122,106 @@ export default function EuroOptionsPricing() {
     });
   };
 
+  function buildAssistantSnapshot():
+    | { inputs: EuroApiResponse["inputs"]; price_and_greeks: EuroApiResponse["price_and_greeks"] }
+    | null {
+    if (!data || !data.inputs || !data.price_and_greeks) return null;
+    return {
+      inputs: data.inputs,
+      price_and_greeks: data.price_and_greeks,
+    };
+  }
+
+  async function handleOpenAssistant() {
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+
+    setAssistantOpen(true);
+    setAssistantError(null);
+
+    if (assistantMessages.length > 0) return;
+
+    setAssistantLoading(true);
+    try {
+      const resp = await fetch("/api/assistant/euro/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          message:
+            "Explain this European option's fair value and Greeks in simple terms, focusing on what each sensitivity means for the trader.",
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else if ((json as any).reply) {
+        setAssistantMessages([
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: (json as any).reply,
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  async function handleSendAssistantMessage(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = assistantInput.trim();
+    if (!trimmed) return;
+
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+
+    const userMsg: AssistantMessage = {
+      id: Date.now(),
+      role: "user",
+      content: trimmed,
+    };
+
+    const history = [...assistantMessages, userMsg];
+    setAssistantMessages(history);
+    setAssistantInput("");
+    setAssistantLoading(true);
+    setAssistantError(null);
+
+    try {
+      const resp = await fetch("/api/assistant/euro/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          messages: history.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else if ((json as any).reply) {
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            role: "assistant",
+            content: (json as any).reply,
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
   return (
     <Box
       sx={{
@@ -118,8 +233,11 @@ export default function EuroOptionsPricing() {
     >
       <Container maxWidth="lg">
         <Box sx={{ mb: 4, textAlign: "center" }}>
-          <Typography variant="h3" fontWeight={700} sx={{ mb: 1 }}>
-            European Option Calculator
+          <Typography variant="h4" fontWeight={700}>
+            European option calculator
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Price a European call or put and view fair value plus Greeks.
           </Typography>
         </Box>
 
@@ -146,23 +264,18 @@ export default function EuroOptionsPricing() {
                     onChange={(e) => setSymbol(e.target.value)}
                     size="small"
                     fullWidth
-                    InputLabelProps={{ shrink: true }}
                   />
-                  <Box>
-                    <Typography variant="caption" sx={{ mb: 1, display: "block" }}>
-                      Side
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={side}
-                      exclusive
-                      onChange={(_, v) => v && setSide(v)}
-                      size="small"
-                      fullWidth
-                    >
-                      <ToggleButton value="CALL">CALL</ToggleButton>
-                      <ToggleButton value="PUT">PUT</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
+                  <ToggleButtonGroup
+                    color="primary"
+                    value={side}
+                    exclusive
+                    onChange={(_, val) => val && setSide(val)}
+                    size="small"
+                  >
+                    <ToggleButton value="CALL">Call</ToggleButton>
+                    <ToggleButton value="PUT">Put</ToggleButton>
+                  </ToggleButtonGroup>
+
                   <Grid container spacing={1.5}>
                     <Grid item xs={6}>
                       <TextField
@@ -171,21 +284,23 @@ export default function EuroOptionsPricing() {
                         onChange={(e) => setStrike(e.target.value)}
                         size="small"
                         fullWidth
-                        InputLabelProps={{ shrink: true }}
+                        type="number"
+                        inputProps={{ step: "0.01" }}
                       />
                     </Grid>
                     <Grid item xs={6}>
                       <TextField
                         label="Expiration"
                         type="date"
-                        value={expiry}
-                        onChange={(e) => setExpiry(e.target.value)}
                         size="small"
                         fullWidth
+                        value={expiry}
+                        onChange={(e) => setExpiry(e.target.value)}
                         InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                   </Grid>
+
                   <TextField
                     select
                     label="Volatility source"
@@ -194,9 +309,10 @@ export default function EuroOptionsPricing() {
                     size="small"
                     fullWidth
                   >
-                    <MenuItem value="HIST">Historical volatility</MenuItem>
-                    <MenuItem value="IV">Implied volatility (needs market price)</MenuItem>
+                    <MenuItem value="HIST">Use historical volatility</MenuItem>
+                    <MenuItem value="IV">Match market option price (IV)</MenuItem>
                   </TextField>
+
                   {volMode === "IV" && (
                     <TextField
                       label="Market option price"
@@ -207,6 +323,7 @@ export default function EuroOptionsPricing() {
                       InputLabelProps={{ shrink: true }}
                     />
                   )}
+
                   <TextField
                     label="Constant σ override (optional)"
                     value={constantVol}
@@ -214,41 +331,39 @@ export default function EuroOptionsPricing() {
                     size="small"
                     fullWidth
                     placeholder="e.g. 0.22"
-                    InputLabelProps={{ shrink: true }}
                   />
+
                   <FormControlLabel
-                    control={<Switch checked={useQL} onChange={(e) => setUseQL(e.target.checked)} />}
+                    control={
+                      <Switch
+                        checked={useQL}
+                        onChange={(e) => setUseQL(e.target.checked)}
+                        size="small"
+                      />
+                    }
                     label="Use QuantLib day count"
                   />
-                  {error && (
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        bgcolor: "rgba(248, 113, 113, 0.1)",
-                        border: "1px solid rgba(248, 113, 113, 0.4)",
-                        borderRadius: 2,
-                        p: 1.2,
-                        color: "#fecaca",
-                      }}
-                    >
-                      {error}
-                    </Typography>
-                  )}
+
                   <Button
                     type="submit"
                     variant="contained"
-                    size="large"
                     disabled={loading}
                     sx={{
-                      borderRadius: 2,
+                      mt: 1,
+                      borderRadius: 999,
                       textTransform: "none",
-                      py: 1.5,
                       fontWeight: 600,
                     }}
                     fullWidth
                   >
-                    {loading ? "Calculating…" : "Calculate price & greeks"}
+                    {loading ? "Calculating…" : "Calculate price & Greeks"}
                   </Button>
+
+                  {error && (
+                    <Typography variant="body2" color="error">
+                      {error}
+                    </Typography>
+                  )}
                 </Stack>
               </Box>
             </Paper>
@@ -265,9 +380,7 @@ export default function EuroOptionsPricing() {
                 boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
               }}
             >
-              <Box
-                sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
-              >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Box>
                   <Typography variant="h6" fontWeight={600}>
                     Latest result
@@ -276,15 +389,26 @@ export default function EuroOptionsPricing() {
                     Shows the last successful calculation from the backend.
                   </Typography>
                 </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleViewChart}
-                  disabled={!data}
-                  sx={{ borderRadius: 999, textTransform: "none" }}
-                >
-                  View Greeks chart
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleViewChart}
+                    disabled={!data}
+                    sx={{ borderRadius: 999, textTransform: "none" }}
+                  >
+                    View Greeks chart
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleOpenAssistant}
+                    disabled={!data}
+                    sx={{ borderRadius: 999, textTransform: "none" }}
+                  >
+                    Ask FinanceBud
+                  </Button>
+                </Stack>
               </Box>
 
               <Divider sx={{ my: 2.5 }} />
@@ -324,10 +448,10 @@ export default function EuroOptionsPricing() {
                       <Typography variant="caption" color="text.secondary">
                         As of
                       </Typography>
-                      <Typography variant="body2">
+                      <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
                         {new Date(data.inputs.as_of).toLocaleDateString()}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                         Exp: {new Date(data.inputs.expiry).toLocaleDateString()}
                       </Typography>
                     </Box>
@@ -342,10 +466,7 @@ export default function EuroOptionsPricing() {
                         <Typography variant="caption" color="text.secondary">
                           Delta
                         </Typography>
-                        <Typography
-                          variant="h6"
-                          sx={{ fontVariantNumeric: "tabular-nums" }}
-                        >
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
                           {data.price_and_greeks.delta.toFixed(4)}
                         </Typography>
                       </Paper>
@@ -358,10 +479,7 @@ export default function EuroOptionsPricing() {
                         <Typography variant="caption" color="text.secondary">
                           Gamma
                         </Typography>
-                        <Typography
-                          variant="h6"
-                          sx={{ fontVariantNumeric: "tabular-nums" }}
-                        >
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
                           {data.price_and_greeks.gamma.toFixed(6)}
                         </Typography>
                       </Paper>
@@ -374,10 +492,7 @@ export default function EuroOptionsPricing() {
                         <Typography variant="caption" color="text.secondary">
                           Theta
                         </Typography>
-                        <Typography
-                          variant="h6"
-                          sx={{ fontVariantNumeric: "tabular-nums" }}
-                        >
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
                           {data.price_and_greeks.theta.toFixed(4)}
                         </Typography>
                       </Paper>
@@ -390,10 +505,7 @@ export default function EuroOptionsPricing() {
                         <Typography variant="caption" color="text.secondary">
                           Vega
                         </Typography>
-                        <Typography
-                          variant="h6"
-                          sx={{ fontVariantNumeric: "tabular-nums" }}
-                        >
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
                           {data.price_and_greeks.vega.toFixed(4)}
                         </Typography>
                       </Paper>
@@ -406,15 +518,102 @@ export default function EuroOptionsPricing() {
                         <Typography variant="caption" color="text.secondary">
                           Rho
                         </Typography>
-                        <Typography
-                          variant="h6"
-                          sx={{ fontVariantNumeric: "tabular-nums" }}
-                        >
+                        <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
                           {data.price_and_greeks.rho.toFixed(4)}
                         </Typography>
                       </Paper>
                     </Grid>
                   </Grid>
+
+                  {assistantOpen && (
+                    <Box
+                      sx={{
+                        mt: 3,
+                        p: 2,
+                        borderRadius: 2,
+                        border: "1px solid rgba(148,163,184,0.4)",
+                        backgroundColor: "rgba(15,23,42,0.7)",
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                        FinanceBud&apos;s explanation
+                      </Typography>
+                      {assistantError && (
+                        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                          {assistantError}
+                        </Typography>
+                      )}
+                      <Box
+                        sx={{
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          mb: 1.5,
+                          pr: 1,
+                        }}
+                      >
+                        {assistantMessages.length === 0 &&
+                          !assistantLoading &&
+                          !assistantError && (
+                            <Typography variant="body2" color="text.secondary">
+                              Click &quot;Ask FinanceBud&quot; to get an explanation of this run.
+                            </Typography>
+                          )}
+                        {assistantMessages.map((msg) => (
+                          <Box
+                            key={msg.id}
+                            sx={{
+                              mb: 1,
+                              textAlign: msg.role === "user" ? "right" : "left",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "inline-block",
+                                px: 1.5,
+                                py: 1,
+                                borderRadius: 2,
+                                backgroundColor:
+                                  msg.role === "user"
+                                    ? "rgba(59,130,246,0.3)"
+                                    : "rgba(15,23,42,0.9)",
+                              }}
+                            >
+                              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                                {msg.content}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                        {assistantLoading && (
+                          <Typography variant="body2" color="text.secondary">
+                            Thinking...
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box
+                        component="form"
+                        onSubmit={handleSendAssistantMessage}
+                        sx={{ display: "flex", gap: 1 }}
+                      >
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Ask a question about this fair value or Greeks..."
+                          value={assistantInput}
+                          onChange={(e) => setAssistantInput(e.target.value)}
+                          disabled={assistantLoading}
+                          variant="outlined"
+                        />
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          disabled={assistantLoading || !assistantInput.trim()}
+                        >
+                          Send
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
               )}
             </Paper>
