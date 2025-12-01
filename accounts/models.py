@@ -37,12 +37,24 @@ class SavedRuns(models.Model):
     Price = models.FloatField()
     Rho = models.FloatField()
     Gamma = models.FloatField()
-    OptionType = models.CharField(max_length=4, choices=[("Call", "Call"), ("Put", "Put")])
+    OptionType = models.CharField(
+        max_length=4,
+        choices=[("Call", "Call"), ("Put", "Put")],
+    )
+    OptionStyle = models.CharField(
+        max_length=8,
+        choices=[("EURO", "European"), ("AMER", "American")],
+        default="EURO",
+    )
     ImpliedVolatility = models.FloatField()
     Theta = models.FloatField()
     Vega = models.FloatField()
     Delta = models.FloatField()
-    Username = models.ForeignKey(UserAccounts, to_field="Username", on_delete=models.CASCADE)
+    Username = models.ForeignKey(
+        UserAccounts,
+        to_field="Username",
+        on_delete=models.CASCADE,
+    )
 
 class OPENAIAPIRESPONSE(models.Model):
     id = models.AutoField(primary_key=True)

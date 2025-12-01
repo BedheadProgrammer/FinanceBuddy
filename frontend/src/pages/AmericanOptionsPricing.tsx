@@ -24,7 +24,12 @@ type Inputs = {
 type AmericanResult = {
   american_price: number; european_price: number; early_exercise_premium: number; critical_price: number | null;
 };
-type AmericanApiResponse = { inputs: Inputs; american_result: AmericanResult } | { error: string };
+type Greeks = {
+  fair_value: number; delta: number; gamma: number; theta: number; vega: number; rho: number;
+};
+type AmericanApiResponse =
+  | { inputs: Inputs; american_result: AmericanResult; greeks: Greeks }
+  | { error: string };
 
 type AssistantMessage = { id: number; role: "user" | "assistant"; content: string };
 
@@ -55,6 +60,7 @@ export default function AmericanOptionsPricing() {
     return {
       inputs: (data as any).inputs,
       american_result: (data as any).american_result,
+      greeks: (data as any).greeks,
     };
   }
 
@@ -74,7 +80,7 @@ export default function AmericanOptionsPricing() {
         body: JSON.stringify({
           snapshot,
           message:
-            "Explain this American option pricing result in simple terms, including what the prices, premium, and early exercise behavior mean for the trader.",
+            "Explain this American option pricing result in simple terms, including what the prices, premium, early exercise behavior, and Greeks mean for the trader.",
         }),
       });
       const json = await resp.json();
@@ -173,6 +179,17 @@ export default function AmericanOptionsPricing() {
     } finally {
       setLoading(false);
     }
+  }
+
+  const hasResult = !!data && !(data as any).error && (data as any).american_result;
+  const result = hasResult ? (data as any) : null;
+
+  let criticalDisplay = "N/A";
+  if (result) {
+    const raw = result.american_result.critical_price as number | null;
+    const Knum = result.inputs.K as number;
+    const invalid = raw == null || !Number.isFinite(raw) || raw <= 0 || !Knum || raw > 10 * Knum;
+    criticalDisplay = invalid ? "N/A" : raw.toFixed(4);
   }
 
   return (
@@ -346,7 +363,7 @@ export default function AmericanOptionsPricing() {
                 <Button
                   variant="outlined"
                   size="small"
-                  disabled={!data || !(data as any).american_result}
+                  disabled={!hasResult}
                   sx={{ borderRadius: 999, textTransform: "none" }}
                   onClick={handleOpenAssistant}
                 >
@@ -356,10 +373,10 @@ export default function AmericanOptionsPricing() {
 
               <Divider sx={{ my: 2.5 }} />
 
-              {!data || !(data as any).american_result ? (
+              {!hasResult ? (
                 <Box sx={{ py: 6, textAlign: "center" }}>
                   <Typography variant="body1" color="text.secondary">
-                    Run a calculation to see American vs. European price and premium.
+                    Run a calculation to see American vs. European price, early exercise premium, and Greeks.
                   </Typography>
                 </Box>
               ) : (
@@ -377,14 +394,14 @@ export default function AmericanOptionsPricing() {
                         American price
                       </Typography>
                       <Typography variant="h3" fontWeight={700} sx={{ mt: 0.5 }}>
-                        ${(data as any).american_result.american_price.toFixed(2)}
+                        ${result.american_result.american_price.toFixed(2)}
                       </Typography>
                       <Typography
                         variant="caption"
                         color="text.secondary"
                         sx={{ mt: 0.5, display: "block" }}
                       >
-                        {(data as any).inputs.side} on {(data as any).inputs.symbol} @ {(data as any).inputs.K}
+                        {result.inputs.side} on {result.inputs.symbol} @ {result.inputs.K}
                       </Typography>
                     </Box>
                     <Box sx={{ textAlign: "right" }}>
@@ -395,10 +412,10 @@ export default function AmericanOptionsPricing() {
                         variant="body2"
                         sx={{ fontVariantNumeric: "tabular-nums", display: "block" }}
                       >
-                        {(data as any).inputs.as_of}
+                        {result.inputs.as_of}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-                        Exp: {(data as any).inputs.expiry}
+                        Exp: {result.inputs.expiry}
                       </Typography>
                     </Box>
                   </Box>
@@ -413,7 +430,7 @@ export default function AmericanOptionsPricing() {
                           European price
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {(data as any).american_result.european_price.toFixed(4)}
+                          {result.american_result.european_price.toFixed(4)}
                         </Typography>
                       </Paper>
                     </Grid>
@@ -426,7 +443,7 @@ export default function AmericanOptionsPricing() {
                           Early exercise premium
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {(data as any).american_result.early_exercise_premium.toFixed(6)}
+                          {result.american_result.early_exercise_premium.toFixed(6)}
                         </Typography>
                       </Paper>
                     </Grid>
@@ -439,9 +456,7 @@ export default function AmericanOptionsPricing() {
                           Critical price
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {(data as any).american_result.critical_price === null
-                            ? "N/A"
-                            : (data as any).american_result.critical_price.toFixed(4)}
+                          {criticalDisplay}
                         </Typography>
                       </Paper>
                     </Grid>
@@ -454,13 +469,83 @@ export default function AmericanOptionsPricing() {
                           Strike
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {(data as any).inputs.K.toFixed
-                            ? (data as any).inputs.K.toFixed(2)
-                            : (data as any).inputs.K}
+                          {result.inputs.K.toFixed
+                            ? result.inputs.K.toFixed(2)
+                            : result.inputs.K}
                         </Typography>
                       </Paper>
                     </Grid>
                   </Grid>
+
+                  {result.greeks && (
+                    <Grid container spacing={1.5} sx={{ mt: 1.5 }}>
+                      <Grid item xs={6} sm={4}>
+                        <Paper
+                          variant="outlined"
+                          sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Delta
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                            {result.greeks.delta.toFixed(4)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6} sm={4}>
+                        <Paper
+                          variant="outlined"
+                          sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Gamma
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                            {result.greeks.gamma.toFixed(6)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6} sm={4}>
+                        <Paper
+                          variant="outlined"
+                          sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Theta
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                            {result.greeks.theta.toFixed(4)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6} sm={6}>
+                        <Paper
+                          variant="outlined"
+                          sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Vega
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                            {result.greeks.vega.toFixed(4)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6} sm={6}>
+                        <Paper
+                          variant="outlined"
+                          sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Rho
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                            {result.greeks.rho.toFixed(4)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  )}
 
                   {assistantOpen && (
                     <Box
