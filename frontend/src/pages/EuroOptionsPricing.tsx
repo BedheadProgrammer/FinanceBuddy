@@ -51,7 +51,7 @@ type AssistantMessage = {
 export default function EuroOptionsPricing() {
   const navigate = useNavigate();
 
-  usePageMeta("European Option Calculator | FinanceBuddy", "European option calculator");
+  usePageMeta("European Option Calculator | FinanceBuddy", "European Option Calculator");
 
   const [symbol, setSymbol] = useState("AAPL");
   const [side, setSide] = useState<"CALL" | "PUT">("CALL");
@@ -234,7 +234,7 @@ export default function EuroOptionsPricing() {
       <Container maxWidth="lg">
         <Box sx={{ mb: 4, textAlign: "center" }}>
           <Typography variant="h4" fontWeight={700}>
-            European option calculator
+            European Option Calculator
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             Price a European call or put and view fair value plus Greeks.

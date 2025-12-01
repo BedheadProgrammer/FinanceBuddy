@@ -6,6 +6,7 @@ from datetime import date
 import math
 import os
 
+
 from .data_sources import MarketDataSource, CombinedDataSource
 
 
@@ -283,21 +284,19 @@ class BAWAmericanOptionCalculator:
 
         early_exercise_premium = american_price - european_price
 
-        eps_abs = abs(early_exercise_premium)
-        eps_thresh = max(1e-4, 1e-6 * max(1.0, abs(european_price)))
-        invalid_boundary = (
-            critical_price is None
-            or not math.isfinite(critical_price)
-            or critical_price <= 0.0
-        )
+        if not math.isfinite(american_price) or not math.isfinite(early_exercise_premium):
+            return {
+                "american_price": european_price,
+                "european_price": european_price,
+                "early_exercise_premium": 0.0,
+                "critical_price": None,
+            }
 
-        if (
-            invalid_boundary
-            or eps_abs < eps_thresh
-            or early_exercise_premium < 0.0
-        ):
+        if early_exercise_premium < 0.0:
             american_price = european_price
             early_exercise_premium = 0.0
+
+        if critical_price is None or not math.isfinite(critical_price) or critical_price <= 0.0:
             critical_price = None
 
         return {

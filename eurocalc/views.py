@@ -118,10 +118,21 @@ def american_price_api(request: HttpRequest) -> JsonResponse:
             T=vars_["T"],
             side=vars_["side"],
         )
+
+        greeks_calc = GreeksCalculator()
+        greeks = greeks_calc.compute(
+            S=vars_["S"],
+            K=vars_["K"],
+            r=vars_["r"],
+            q=vars_["q"],
+            sigma=vars_["sigma"],
+            T=vars_["T"],
+            side=vars_["side"],
+        )
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
-    out = {"inputs": vars_, "american_result": am_result}
+    out = {"inputs": vars_, "american_result": am_result, "greeks": greeks}
     if isinstance(out["inputs"].get("as_of"), date):
         out["inputs"]["as_of"] = out["inputs"]["as_of"].isoformat()
     if isinstance(out["inputs"].get("expiry"), date):
