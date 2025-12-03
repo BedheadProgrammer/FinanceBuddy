@@ -7,6 +7,7 @@ import { useAuth } from '../store/auth'
 
 type FormValues = {
   username: string
+  email: string
   password: string
   confirm: string
 }
@@ -17,8 +18,8 @@ export function Register() {
     'Create a FinanceBuddy account to explore options pricing tools and analytics.',
   )
 
-  const { register, handleSubmit } = useForm<FormValues>()
-  const { login } = useAuth()
+  const { register: formRegister, handleSubmit } = useForm<FormValues>()
+  const { register: registerUser } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
 
@@ -31,28 +32,12 @@ export function Register() {
     }
 
     try {
-      const resp = await fetch('/api/auth/register/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          username: data.username,
-          password: data.password,
-          confirm: data.confirm,
-        }),
+      await registerUser({
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        confirm: data.confirm,
       })
-
-      const payload: any = await resp.json().catch(() => ({}))
-
-      if (!resp.ok) {
-        const message =
-          (payload && typeof payload.error === 'string' && payload.error) ||
-          'Registration failed'
-        throw new Error(message)
-      }
-
-      // Also tell the React auth context we are logged in
-      await login(data.username, data.password)
       navigate('/dashboard')
     } catch (e: any) {
       setError(e?.message || 'Registration failed')
@@ -81,19 +66,25 @@ export function Register() {
         <Stack spacing={2}>
           <TextField
             label="Username"
-            {...register('username', { required: true })}
+            {...formRegister('username', { required: true })}
+            fullWidth
+          />
+          <TextField
+            label="Email"
+            type="email"
+            {...formRegister('email', { required: true })}
             fullWidth
           />
           <TextField
             label="Password"
             type="password"
-            {...register('password', { required: true })}
+            {...formRegister('password', { required: true })}
             fullWidth
           />
           <TextField
             label="Confirm Password"
             type="password"
-            {...register('confirm', { required: true })}
+            {...formRegister('confirm', { required: true })}
             fullWidth
           />
           <Button type="submit" variant="contained">
