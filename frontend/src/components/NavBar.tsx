@@ -29,7 +29,6 @@ export function NavBar() {
           gap: 2,
         }}
       >
-
         <Box
           component={RouterLink}
           to={homeTarget}
@@ -100,10 +99,12 @@ export function NavBar() {
               <Button color="inherit" component={RouterLink} to="/tools/euro/greeks">
                 Greeks
               </Button>
+              <Button color="inherit" component={RouterLink} to="/portfolio">
+                Portfolio
+              </Button>
             </>
           )}
         </Box>
-
 
         <Box sx={{ display: "flex", gap: 1 }}>
           {isAuthenticated ? (
