@@ -1,5 +1,7 @@
 from __future__ import annotations
-
+from .models import Portfolio, Position, Trade
+from BE1.MRKT_WTCH import get_current_prices, POPULAR
+from optnstrdr.models import OptionPosition
 import json
 import os
 from typing import Dict, List
@@ -229,8 +231,7 @@ def portfolio_summary(request: HttpRequest) -> JsonResponse:
             market_error = str(e)
             market_data = {}
 
-    from decimal import Decimal as _D
-    total_positions_value = _D("0")
+    total_positions_value = Decimal("0")
 
     positions_payload = []
     for pos in positions:
@@ -241,7 +242,7 @@ def portfolio_summary(request: HttpRequest) -> JsonResponse:
             market_value = None
             unrealized_pnl = None
         else:
-            market_price = _D(str(price_val))
+            market_price = Decimal(str(price_val))
             market_value = market_price * pos.quantity
             cost_basis = pos.avg_cost * pos.quantity
             unrealized_pnl = market_value - cost_basis
@@ -258,6 +259,22 @@ def portfolio_summary(request: HttpRequest) -> JsonResponse:
                 "error": info.get("error"),
             }
         )
+
+    options_total_value = Decimal("0")
+    option_positions_qs = (
+        OptionPosition.objects
+        .filter(portfolio=portfolio)
+        .select_related("contract")
+    )
+
+    for opt_pos in option_positions_qs:
+        qty = opt_pos.quantity
+        cost = opt_pos.avg_cost
+        mult_int = opt_pos.contract.multiplier or 0
+        mult = Decimal(str(mult_int))
+        options_total_value += qty * cost * mult
+
+    total_positions_value += options_total_value
 
     total_equity = portfolio.cash_balance + total_positions_value
 

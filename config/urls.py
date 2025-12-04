@@ -42,6 +42,7 @@ urlpatterns = [
         "api/euro/",
         include(("eurocalc.urls", "eurocalc"), namespace="eurocalc_api"),
     ),
+    path("", include("optnstrdr.urls")),
     path(
         "api/american/",
         include(

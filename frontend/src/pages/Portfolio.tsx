@@ -67,6 +67,88 @@ type TradeResponse = {
   error?: string;
 };
 
+type AssistantMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+};
+
+type OptionSide = "CALL" | "PUT";
+type OptionStyle = "EUROPEAN" | "AMERICAN";
+
+type OptionPositionApi = {
+  id: number;
+  portfolio_id: number;
+  contract_id: number;
+  underlying_symbol: string;
+  option_side: OptionSide;
+  option_style: OptionStyle;
+  strike: string;
+  expiry: string;
+  multiplier: number;
+  quantity: string;
+  avg_cost: string;
+};
+
+type OptionPositionsApiResponse = {
+  portfolio: {
+    id: number;
+    cash: string;
+  };
+  positions: OptionPositionApi[];
+  error?: string;
+};
+
+type OptionPosition = {
+  id: number;
+  contract_id: number;
+  underlying_symbol: string;
+  option_side: OptionSide;
+  option_style: OptionStyle;
+  strike: number;
+  expiry: string;
+  multiplier: number;
+  quantity: number;
+  avg_cost: number;
+};
+
+type OptionTradeResponse = {
+  trade: {
+    id: number;
+    portfolio_id: number;
+    contract_id: number;
+    side: TradeSide;
+    quantity: string;
+    price: string;
+    fees: string;
+    order_type: string;
+    status: string;
+    realized_pl: string;
+    underlying_price_at_execution: string | null;
+    executed_at: string;
+  };
+  contract: {
+    id: number;
+    underlying_symbol: string;
+    option_side: OptionSide;
+    option_style: OptionStyle;
+    strike: string;
+    expiry: string;
+    multiplier: number;
+    contract_symbol: string | null;
+  };
+  portfolio: {
+    id: number;
+    cash: string;
+  };
+  position: {
+    id: number;
+    quantity: string;
+    avg_cost: string;
+  } | null;
+  error?: string;
+};
+
 export default function Portfolio() {
   usePageMeta("Portfolio | FinanceBuddy", "Virtual Stock Exchange Portfolio");
 
@@ -82,6 +164,27 @@ export default function Portfolio() {
   const [tradeLoading, setTradeLoading] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [tradeSuccess, setTradeSuccess] = useState<string | null>(null);
+
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+  const [assistantInput, setAssistantInput] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
+
+  const [optionSymbol, setOptionSymbol] = useState("AAPL");
+  const [optionTradeSide, setOptionTradeSide] = useState<TradeSide>("BUY");
+  const [optionSide, setOptionSide] = useState<OptionSide>("CALL");
+  const [optionStyle, setOptionStyle] = useState<OptionStyle>("AMERICAN");
+  const [optionStrike, setOptionStrike] = useState("");
+  const [optionExpiry, setOptionExpiry] = useState("");
+  const [optionQuantity, setOptionQuantity] = useState("1");
+  const [optionTradeLoading, setOptionTradeLoading] = useState(false);
+  const [optionTradeError, setOptionTradeError] = useState<string | null>(null);
+  const [optionTradeSuccess, setOptionTradeSuccess] = useState<string | null>(null);
+
+  const [optionPositions, setOptionPositions] = useState<OptionPosition[]>([]);
+  const [optionPositionsLoading, setOptionPositionsLoading] = useState(false);
+  const [optionPositionsError, setOptionPositionsError] = useState<string | null>(null);
 
   async function fetchSummary() {
     setSummaryError(null);
@@ -107,9 +210,51 @@ export default function Portfolio() {
     }
   }
 
+  async function fetchOptionPositions(portfolioId: number) {
+    setOptionPositionsError(null);
+    setOptionPositionsLoading(true);
+    try {
+      const res = await fetch(`/api/options/positions/?portfolio_id=${portfolioId}`, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      });
+      const json = (await res.json()) as OptionPositionsApiResponse;
+      if (!res.ok || (json as any).error) {
+        const msg = json.error || (json as any).error || "Failed to load option positions.";
+        setOptionPositionsError(msg);
+        setOptionPositions([]);
+      } else {
+        const mapped: OptionPosition[] = json.positions.map((p) => ({
+          id: p.id,
+          contract_id: p.contract_id,
+          underlying_symbol: p.underlying_symbol,
+          option_side: p.option_side,
+          option_style: p.option_style,
+          strike: Number(p.strike),
+          expiry: p.expiry,
+          multiplier: p.multiplier,
+          quantity: Number(p.quantity),
+          avg_cost: Number(p.avg_cost),
+        }));
+        setOptionPositions(mapped);
+      }
+    } catch (err: any) {
+      setOptionPositionsError(err?.message || "Failed to load option positions.");
+      setOptionPositions([]);
+    } finally {
+      setOptionPositionsLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetchSummary();
   }, []);
+
+  useEffect(() => {
+    if (summary?.portfolio.id) {
+      fetchOptionPositions(summary.portfolio.id);
+    }
+  }, [summary?.portfolio.id]);
 
   async function handleSubmitTrade(e: React.FormEvent) {
     e.preventDefault();
@@ -167,6 +312,128 @@ export default function Portfolio() {
     }
   }
 
+  async function handleSubmitOptionTrade(e: React.FormEvent) {
+    e.preventDefault();
+    setOptionTradeError(null);
+    setOptionTradeSuccess(null);
+
+    if (!summary) {
+      setOptionTradeError("Portfolio is not loaded yet.");
+      return;
+    }
+
+    const symbolTrimmed = optionSymbol.trim();
+    const quantityTrimmed = optionQuantity.trim();
+    const strikeTrimmed = optionStrike.trim();
+    const expiryTrimmed = optionExpiry.trim();
+
+    if (!symbolTrimmed || !strikeTrimmed || !expiryTrimmed || !quantityTrimmed) {
+      setOptionTradeError(
+        "Underlying symbol, strike, expiry date, and contracts quantity are required."
+      );
+      return;
+    }
+
+    const quantityNum = Number(quantityTrimmed);
+    const strikeNum = Number(strikeTrimmed);
+
+    if (!Number.isFinite(strikeNum) || strikeNum <= 0) {
+      setOptionTradeError("Strike must be a positive number.");
+      return;
+    }
+
+    if (!Number.isFinite(quantityNum) || quantityNum <= 0) {
+      setOptionTradeError("Contracts must be a positive number.");
+      return;
+    }
+
+    setOptionTradeLoading(true);
+    try {
+      const symbolUpper = symbolTrimmed.toUpperCase();
+
+      const params = new URLSearchParams({
+        symbol: symbolUpper,
+        side: optionSide,
+        strike: strikeTrimmed,
+        expiry: expiryTrimmed,
+      });
+
+      const quoteUrl =
+        optionStyle === "EUROPEAN"
+          ? `/api/euro/price/?${params.toString()}`
+          : `/api/american/price/?${params.toString()}`;
+
+      const quoteResp = await fetch(quoteUrl, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      });
+      const quoteJson = await quoteResp.json();
+
+      if (!quoteResp.ok || (quoteJson as any).error) {
+        const msg = (quoteJson as any).error || "Failed to calculate option fair value.";
+        setOptionTradeError(msg);
+        return;
+      }
+
+      let fairPrice: number;
+
+      if (optionStyle === "EUROPEAN") {
+        const greeks = (quoteJson as any).price_and_greeks;
+        fairPrice = Number(greeks?.fair_value);
+      } else {
+        const americanResult = (quoteJson as any).american_result;
+        fairPrice = Number(americanResult?.american_price);
+      }
+
+      if (!Number.isFinite(fairPrice) || fairPrice <= 0) {
+        setOptionTradeError("Could not compute a valid fair value for this option.");
+        return;
+      }
+
+      const body = {
+        portfolio_id: summary.portfolio.id,
+        symbol: symbolUpper,
+        option_side: optionSide,
+        option_style: optionStyle,
+        strike: strikeNum,
+        expiry: expiryTrimmed,
+        quantity: quantityNum,
+        price: fairPrice,
+        side: optionTradeSide,
+      };
+
+      const res = await fetch("/api/options/trade/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as OptionTradeResponse;
+
+      if (!res.ok || (json as any).error) {
+        const msg = json.error || (json as any).error || "Options trade failed.";
+        setOptionTradeError(msg);
+      } else {
+        const contract = json.contract;
+        const trade = json.trade;
+        setOptionTradeSuccess(
+          `${trade.side} ${Number(trade.quantity)} ${contract.underlying_symbol} ${contract.option_side} ` +
+            `@ strike ${Number(contract.strike).toFixed(2)} exp ${contract.expiry}`
+        );
+        setOptionQuantity("1");
+        await fetchSummary();
+        await fetchOptionPositions(json.portfolio.id);
+      }
+    } catch (err: any) {
+      setOptionTradeError(err?.message || "Options trade failed.");
+    } finally {
+      setOptionTradeLoading(false);
+    }
+  }
+
   function formatMoney(value: number | null | undefined, currency = "USD") {
     if (value === null || value === undefined || Number.isNaN(value)) {
       return "—";
@@ -183,6 +450,110 @@ export default function Portfolio() {
       return "—";
     }
     return value.toFixed(digits);
+  }
+
+  function buildAssistantSnapshot(): PortfolioSummaryPayload | null {
+    if (!summary) return null;
+    return summary;
+  }
+
+  async function handleOpenAssistant() {
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+
+    setAssistantOpen(true);
+    setAssistantError(null);
+
+    if (assistantMessages.length > 0) {
+      return;
+    }
+
+    setAssistantLoading(true);
+    try {
+      const resp = await fetch("/api/assistant/portfolio/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          message:
+            "Explain this virtual stock portfolio: cash, positions, market value, and unrealized P/L. " +
+            "Point out any concentration, big winners/losers, and anything a student should pay attention to.",
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else if ((json as any).reply) {
+        setAssistantMessages([
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: (json as any).reply,
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  async function handleSendAssistantMessage(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = assistantInput.trim();
+    if (!trimmed) return;
+
+    const snapshot = buildAssistantSnapshot();
+    if (!snapshot) return;
+
+    const userMsg: AssistantMessage = {
+      id: Date.now(),
+      role: "user",
+      content: trimmed,
+    };
+
+    const history = [...assistantMessages, userMsg];
+    setAssistantMessages(history);
+    setAssistantInput("");
+    setAssistantLoading(true);
+    setAssistantError(null);
+
+    try {
+      const resp = await fetch("/api/assistant/portfolio/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          snapshot,
+          messages: history.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || (json as any).error) {
+        setAssistantError((json as any).error || "Assistant request failed");
+      } else if ((json as any).reply) {
+        setAssistantMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            role: "assistant",
+            content: (json as any).reply,
+          },
+        ]);
+      }
+    } catch (err: any) {
+      setAssistantError(err?.message || "Assistant request failed");
+    } finally {
+      setAssistantLoading(false);
+    }
   }
 
   const currency = summary?.portfolio.currency || "USD";
@@ -216,6 +587,7 @@ export default function Portfolio() {
                 border: "1px solid rgba(255,255,255,0.08)",
                 background: "linear-gradient(160deg, #0f172a 0%, #020617 50%, #0f172a 100%)",
                 boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                mb: 3,
               }}
             >
               <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
@@ -291,7 +663,7 @@ export default function Portfolio() {
                     }}
                     fullWidth
                   >
-                    {tradeLoading ? "Submitting trade..." : "Submit trade"}
+                    {tradeLoading ? "Submitting trade…" : "Submit trade"}
                   </Button>
 
                   {tradeError && (
@@ -302,6 +674,142 @@ export default function Portfolio() {
                   {tradeSuccess && (
                     <Typography variant="body2" color="success.main">
                       {tradeSuccess}
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+            </Paper>
+
+            <Paper
+              elevation={3}
+              sx={{
+                p: 4,
+                borderRadius: 3,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "linear-gradient(160deg, #0f172a 0%, #020617 50%, #0f172a 100%)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              }}
+            >
+              <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                Place options trade
+              </Typography>
+              <Box component="form" onSubmit={handleSubmitOptionTrade}>
+                <Stack spacing={2.5}>
+                  <TextField
+                    label="Underlying symbol"
+                    value={optionSymbol}
+                    onChange={(e) => setOptionSymbol(e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+
+                  <ToggleButtonGroup
+                    color="primary"
+                    value={optionTradeSide}
+                    exclusive
+                    onChange={(_, val) => val && setOptionTradeSide(val)}
+                    size="small"
+                  >
+                    <ToggleButton value="BUY">Buy</ToggleButton>
+                    <ToggleButton value="SELL">Sell</ToggleButton>
+                  </ToggleButtonGroup>
+
+                  <Grid container spacing={1.5}>
+                    <GridItem item xs={6}>
+                      <ToggleButtonGroup
+                        color="primary"
+                        value={optionSide}
+                        exclusive
+                        onChange={(_, val) => val && setOptionSide(val)}
+                        size="small"
+                        fullWidth
+                      >
+                        <ToggleButton value="CALL">Call</ToggleButton>
+                        <ToggleButton value="PUT">Put</ToggleButton>
+                      </ToggleButtonGroup>
+                    </GridItem>
+                    <GridItem item xs={6}>
+                      <ToggleButtonGroup
+                        color="primary"
+                        value={optionStyle}
+                        exclusive
+                        onChange={(_, val) => val && setOptionStyle(val)}
+                        size="small"
+                        fullWidth
+                      >
+                        <ToggleButton value="AMERICAN">American</ToggleButton>
+                        <ToggleButton value="EUROPEAN">European</ToggleButton>
+                      </ToggleButtonGroup>
+                    </GridItem>
+                  </Grid>
+
+                  <Grid container spacing={1.5}>
+                    <GridItem item xs={6}>
+                      <TextField
+                        label="Strike"
+                        value={optionStrike}
+                        onChange={(e) => setOptionStrike(e.target.value)}
+                        size="small"
+                        fullWidth
+                        type="number"
+                        inputProps={{ step: "0.01", min: "0" }}
+                      />
+                    </GridItem>
+                    <GridItem item xs={6}>
+                      <TextField
+                        label="Expiry"
+                        value={optionExpiry}
+                        onChange={(e) => setOptionExpiry(e.target.value)}
+                        size="small"
+                        fullWidth
+                        type="date"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </GridItem>
+                  </Grid>
+
+                  <Grid container spacing={1.5}>
+                    <GridItem item xs={6}>
+                      <TextField
+                        label="Contracts"
+                        value={optionQuantity}
+                        onChange={(e) => setOptionQuantity(e.target.value)}
+                        size="small"
+                        fullWidth
+                        type="number"
+                        inputProps={{ step: "1", min: "0" }}
+                      />
+                    </GridItem>
+                  </Grid>
+
+                  <Typography variant="caption" color="text.secondary">
+                    One options contract controls 100 shares by default; total notional is premium ×
+                    contracts × 100. Premium is calculated automatically using your option pricer.
+                  </Typography>
+
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={optionTradeLoading}
+                    sx={{
+                      mt: 1,
+                      borderRadius: 999,
+                      textTransform: "none",
+                      fontWeight: 600,
+                    }}
+                    fullWidth
+                  >
+                    {optionTradeLoading ? "Submitting options trade…" : "Submit options trade"}
+                  </Button>
+
+                  {optionTradeError && (
+                    <Typography variant="body2" color="error">
+                      {optionTradeError}
+                    </Typography>
+                  )}
+                  {optionTradeSuccess && (
+                    <Typography variant="body2" color="success.main">
+                      {optionTradeSuccess}
                     </Typography>
                   )}
                 </Stack>
@@ -329,6 +837,25 @@ export default function Portfolio() {
                     Live snapshot of your simulated account and holdings.
                   </Typography>
                 </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleOpenAssistant}
+                  disabled={!summary || summaryLoading || !!summaryError}
+                  sx={{
+                    borderRadius: 999,
+                    textTransform: "none",
+                    backgroundColor: "black",
+                    borderColor: "black",
+                    color: "white",
+                    "&:hover": {
+                      backgroundColor: "#111",
+                      borderColor: "#111",
+                    },
+                  }}
+                >
+                  Ask FinanceBud
+                </Button>
               </Box>
 
               <Divider sx={{ my: 2.5 }} />
@@ -336,7 +863,7 @@ export default function Portfolio() {
               {summaryLoading && (
                 <Box sx={{ py: 4, textAlign: "center" }}>
                   <Typography variant="body2" color="text.secondary">
-                    Loading portfolio...
+                    Loading portfolio…
                   </Typography>
                 </Box>
               )}
@@ -420,7 +947,7 @@ export default function Portfolio() {
                   ) : (
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                        Open positions
+                        Open stock positions
                       </Typography>
                       <Box
                         sx={{
@@ -469,10 +996,7 @@ export default function Portfolio() {
                                   <TableCell align="right">
                                     {formatMoney(pos.market_value, currency)}
                                   </TableCell>
-                                  <TableCell
-                                    align="right"
-                                    sx={{ color: color }}
-                                  >
+                                  <TableCell align="right" sx={{ color }}>
                                     {pnl === null ? "—" : formatMoney(pnl, currency)}
                                   </TableCell>
                                 </TableRow>
@@ -480,6 +1004,180 @@ export default function Portfolio() {
                             })}
                           </TableBody>
                         </Table>
+                      </Box>
+                    </Box>
+                  )}
+
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                      Open option positions
+                    </Typography>
+
+                    {optionPositionsLoading && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Loading option positions…
+                      </Typography>
+                    )}
+
+                    {optionPositionsError && !optionPositionsLoading && (
+                      <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                        {optionPositionsError}
+                      </Typography>
+                    )}
+
+                    {!optionPositionsLoading &&
+                      !optionPositionsError &&
+                      optionPositions.length === 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                          No open option positions yet. Place an options trade to open a contract.
+                        </Typography>
+                      )}
+
+                    {!optionPositionsLoading &&
+                      !optionPositionsError &&
+                      optionPositions.length > 0 && (
+                        <Box
+                          sx={{
+                            mt: 1,
+                            maxHeight: 260,
+                            overflowY: "auto",
+                            borderRadius: 2,
+                            border: "1px solid rgba(148,163,184,0.3)",
+                          }}
+                        >
+                          <Table size="small" stickyHeader>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Contract</TableCell>
+                                <TableCell align="right">Side</TableCell>
+                                <TableCell align="right">Style</TableCell>
+                                <TableCell align="right">Strike</TableCell>
+                                <TableCell align="right">Expiry</TableCell>
+                                <TableCell align="right">Contracts</TableCell>
+                                <TableCell align="right">Avg cost</TableCell>
+                                <TableCell align="right">Total value</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {optionPositions.map((pos) => (
+                                <TableRow key={pos.id}>
+                                  <TableCell>{pos.underlying_symbol}</TableCell>
+                                  <TableCell align="right">{pos.option_side}</TableCell>
+                                  <TableCell align="right">
+                                    {pos.option_style === "AMERICAN" ? "American" : "European"}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    {formatNumber(pos.strike, 2)}
+                                  </TableCell>
+                                  <TableCell align="right">{pos.expiry}</TableCell>
+                                  <TableCell align="right">
+                                    {formatNumber(pos.quantity, 4)}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    {formatMoney(pos.avg_cost, currency)}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    {formatMoney(
+                                      pos.avg_cost * pos.quantity * pos.multiplier,
+                                      currency
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </Box>
+                      )}
+                  </Box>
+
+                  {assistantOpen && (
+                    <Box
+                      sx={{
+                        mt: 3,
+                        p: 2,
+                        borderRadius: 2,
+                        border: "1px solid rgba(148,163,184,0.4)",
+                        backgroundColor: "rgba(15,23,42,0.7)",
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                        FinanceBud&apos;s portfolio explanation
+                      </Typography>
+                      {assistantError && (
+                        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                          {assistantError}
+                        </Typography>
+                      )}
+                      <Box
+                        sx={{
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          mb: 1.5,
+                          pr: 1,
+                        }}
+                      >
+                        {assistantMessages.length === 0 &&
+                          !assistantLoading &&
+                          !assistantError && (
+                            <Typography variant="body2" color="text.secondary">
+                              Click &quot;Ask FinanceBud&quot; to get an explanation of your cash,
+                              positions, and unrealized P/L, or ask questions like &quot;why is my
+                              AAPL position down?&quot;
+                            </Typography>
+                          )}
+                        {assistantMessages.map((msg) => (
+                          <Box
+                            key={msg.id}
+                            sx={{
+                              mb: 1,
+                              textAlign: msg.role === "user" ? "right" : "left",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "inline-block",
+                                px: 1.5,
+                                py: 1,
+                                borderRadius: 2,
+                                backgroundColor:
+                                  msg.role === "user"
+                                    ? "rgba(59,130,246,0.3)"
+                                    : "rgba(15,23,42,0.9)",
+                              }}
+                            >
+                              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                                {msg.content}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                        {assistantLoading && (
+                          <Typography variant="body2" color="text.secondary">
+                            Thinking...
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box
+                        component="form"
+                        onSubmit={handleSendAssistantMessage}
+                        sx={{ display: "flex", gap: 1 }}
+                      >
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Ask a question about this portfolio, cash, or P/L..."
+                          value={assistantInput}
+                          onChange={(e) => setAssistantInput(e.target.value)}
+                          disabled={assistantLoading}
+                          variant="outlined"
+                        />
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          disabled={assistantLoading || !assistantInput.trim()}
+                        >
+                          Send
+                        </Button>
                       </Box>
                     </Box>
                   )}

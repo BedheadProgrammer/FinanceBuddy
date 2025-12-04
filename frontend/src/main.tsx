@@ -10,8 +10,19 @@ import './index.css';
 import { AuthProvider } from './store/auth';
 
 const queryClient = new QueryClient();
+
 const theme = createTheme({
   palette: { mode: 'dark' },
+  typography: {
+    fontFamily: [
+      'Work Sans',
+      'system-ui',
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      'sans-serif',
+    ].join(','),
+  },
 });
 
 createRoot(document.getElementById('root') as HTMLElement).render(
