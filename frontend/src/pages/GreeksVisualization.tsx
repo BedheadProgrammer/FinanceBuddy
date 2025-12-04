@@ -1,5 +1,4 @@
-// Greeks visualization page that consumes the last priced option and shows the sensitivities.
-import React, { useEffect, useState } from "react";
+import  { useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -7,10 +6,11 @@ import {
   Grid,
   Button,
   Divider,
-  Stack,
 } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePageMeta } from "../hooks/usePageMeta";
+
+const GridItem = (props: any) => <Grid {...props} />;
 
 type Inputs = {
   symbol: string;
@@ -123,7 +123,7 @@ export default function GreeksVisualization() {
         </Paper>
       ) : (
         <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
+          <GridItem item xs={12} md={4}>
             <Paper
               variant="outlined"
               sx={{ p: 3, borderRadius: 3, backgroundColor: "rgba(2,6,23,0.3)" }}
@@ -154,9 +154,9 @@ export default function GreeksVisualization() {
                 As of {new Date(inputs.as_of).toLocaleDateString()}
               </Typography>
             </Paper>
-          </Grid>
+          </GridItem>
 
-          <Grid item xs={12} md={8}>
+          <GridItem item xs={12} md={8}>
             <Paper
               variant="outlined"
               sx={{ p: 3, borderRadius: 3, backgroundColor: "rgba(2,6,23,0.15)" }}
@@ -165,41 +165,41 @@ export default function GreeksVisualization() {
                 Sensitivities
               </Typography>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={4}>
+                <GridItem item xs={12} sm={6} md={4}>
                   <MetricCard
                     title="Delta"
                     value={greeks.delta.toFixed(4)}
                     helper="Price change vs underlying"
                   />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                </GridItem>
+                <GridItem item xs={12} sm={6} md={4}>
                   <MetricCard
                     title="Gamma"
                     value={greeks.gamma.toFixed(6)}
                     helper="Delta sensitivity"
                   />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                </GridItem>
+                <GridItem item xs={12} sm={6} md={4}>
                   <MetricCard
                     title="Theta"
                     value={greeks.theta.toFixed(4)}
                     helper="Time decay (per year)"
                   />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                </GridItem>
+                <GridItem item xs={12} sm={6} md={4}>
                   <MetricCard
                     title="Vega"
                     value={greeks.vega.toFixed(4)}
                     helper="Volatility sensitivity"
                   />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                </GridItem>
+                <GridItem item xs={12} sm={6} md={4}>
                   <MetricCard
                     title="Rho"
                     value={greeks.rho.toFixed(4)}
                     helper="Rate sensitivity"
                   />
-                </Grid>
+                </GridItem>
               </Grid>
 
               <Divider sx={{ my: 3 }} />
@@ -207,7 +207,7 @@ export default function GreeksVisualization() {
                 Change the inputs on the calculator to recompute and refresh this view.
               </Typography>
             </Paper>
-          </Grid>
+          </GridItem>
         </Grid>
       )}
     </Box>

@@ -13,6 +13,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Landing } from "./pages/Landing";
 import { useAuth } from "./store/auth";
+import Portfolio from "./pages/Portfolio";
 
 type ProtectedRouteProps = {
   children: ReactElement;
@@ -49,7 +50,6 @@ function App(): ReactElement {
             }
           />
 
-
           <Route
             path="/tools/euro"
             element={
@@ -77,6 +77,14 @@ function App(): ReactElement {
             }
           />
 
+          <Route
+            path="/portfolio"
+            element={
+              <ProtectedRoute>
+                <Portfolio />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

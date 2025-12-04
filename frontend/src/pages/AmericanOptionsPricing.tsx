@@ -17,15 +17,35 @@ import {
 } from "@mui/material";
 import { usePageMeta } from "../hooks/usePageMeta";
 
+const GridItem = (props: any) => <Grid {...props} />;
+
 type Inputs = {
-  S: number; K: number; r: number; q: number; sigma: number; T: number;
-  d1: number; d2: number; side: "CALL"|"PUT"; symbol: string; as_of: string; expiry: string;
+  S: number;
+  K: number;
+  r: number;
+  q: number;
+  sigma: number;
+  T: number;
+  d1: number;
+  d2: number;
+  side: "CALL" | "PUT";
+  symbol: string;
+  as_of: string;
+  expiry: string;
 };
 type AmericanResult = {
-  american_price: number; european_price: number; early_exercise_premium: number; critical_price: number | null;
+  american_price: number;
+  european_price: number;
+  early_exercise_premium: number;
+  critical_price: number | null;
 };
 type Greeks = {
-  fair_value: number; delta: number; gamma: number; theta: number; vega: number; rho: number;
+  fair_value: number;
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  rho: number;
 };
 type AmericanApiResponse =
   | { inputs: Inputs; american_result: AmericanResult; greeks: Greeks }
@@ -36,18 +56,18 @@ type AssistantMessage = { id: number; role: "user" | "assistant"; content: strin
 export default function AmericanOptionsPricing() {
   usePageMeta("American Option Calculator | FinanceBuddy", "American option calculator");
 
-  const todayISO = useMemo(() => new Date().toISOString().slice(0,10), []);
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [symbol, setSymbol] = useState("AAPL");
-  const [side, setSide] = useState<"CALL"|"PUT">("CALL");
+  const [side, setSide] = useState<"CALL" | "PUT">("CALL");
   const [strike, setStrike] = useState("200");
   const [expiry, setExpiry] = useState("2026-01-16");
-  const [volMode, setVolMode] = useState<"HIST"|"IV"|"CONST">("HIST");
+  const [volMode, setVolMode] = useState<"HIST" | "IV" | "CONST">("HIST");
   const [marketOptionPrice, setMarketOptionPrice] = useState("");
   const [constantVol, setConstantVol] = useState("");
   const [useQL, setUseQL] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string|null>(null);
-  const [data, setData] = useState<AmericanApiResponse|null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<AmericanApiResponse | null>(null);
 
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
@@ -127,14 +147,14 @@ export default function AmericanOptionsPricing() {
         credentials: "same-origin",
         body: JSON.stringify({
           snapshot,
-          messages: history.map(m => ({ role: m.role, content: m.content })),
+          messages: history.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
       const json = await resp.json();
       if (!resp.ok || (json as any).error) {
         setAssistantError((json as any).error || "Assistant request failed");
       } else if ((json as any).reply) {
-        setAssistantMessages(prev => [
+        setAssistantMessages((prev) => [
           ...prev,
           {
             id: Date.now() + 1,
@@ -152,10 +172,16 @@ export default function AmericanOptionsPricing() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null); setData(null); setLoading(true);
+    setError(null);
+    setData(null);
+    setLoading(true);
 
     const params = new URLSearchParams({
-      symbol: symbol.trim().toUpperCase(), side, strike: strike.trim(), expiry, vol_mode: volMode
+      symbol: symbol.trim().toUpperCase(),
+      side,
+      strike: strike.trim(),
+      expiry,
+      vol_mode: volMode,
     });
     if (volMode === "IV" && marketOptionPrice.trim()) params.set("market_option_price", marketOptionPrice.trim());
     if (constantVol.trim()) params.set("constant_vol", constantVol.trim());
@@ -196,7 +222,7 @@ export default function AmericanOptionsPricing() {
     <Box sx={{ py: 6 }}>
       <Container maxWidth="lg">
         <Grid container spacing={4}>
-          <Grid item xs={12} md={5}>
+          <GridItem item xs={12} md={5}>
             <Paper
               sx={{
                 p: 3,
@@ -242,7 +268,7 @@ export default function AmericanOptionsPricing() {
                     </ToggleButtonGroup>
 
                     <Grid container spacing={1.5}>
-                      <Grid item xs={6}>
+                      <GridItem item xs={6}>
                         <TextField
                           label="Strike"
                           value={strike}
@@ -252,8 +278,8 @@ export default function AmericanOptionsPricing() {
                           type="number"
                           inputProps={{ step: "0.01" }}
                         />
-                      </Grid>
-                      <Grid item xs={6}>
+                      </GridItem>
+                      <GridItem item xs={6}>
                         <TextField
                           label="Expiration"
                           type="date"
@@ -264,7 +290,7 @@ export default function AmericanOptionsPricing() {
                           InputLabelProps={{ shrink: true }}
                           inputProps={{ min: todayISO }}
                         />
-                      </Grid>
+                      </GridItem>
                     </Grid>
 
                     <TextField
@@ -339,9 +365,9 @@ export default function AmericanOptionsPricing() {
                 </Box>
               </Stack>
             </Paper>
-          </Grid>
+          </GridItem>
 
-          <Grid item xs={12} md={7}>
+          <GridItem item xs={12} md={7}>
             <Paper
               sx={{
                 p: 3,
@@ -421,7 +447,7 @@ export default function AmericanOptionsPricing() {
                   </Box>
 
                   <Grid container spacing={1.5}>
-                    <Grid item xs={6} sm={3}>
+                    <GridItem item xs={6} sm={3}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -433,8 +459,8 @@ export default function AmericanOptionsPricing() {
                           {result.american_result.european_price.toFixed(4)}
                         </Typography>
                       </Paper>
-                    </Grid>
-                    <Grid item xs={6} sm={3}>
+                    </GridItem>
+                    <GridItem item xs={6} sm={3}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -446,8 +472,8 @@ export default function AmericanOptionsPricing() {
                           {result.american_result.early_exercise_premium.toFixed(6)}
                         </Typography>
                       </Paper>
-                    </Grid>
-                    <Grid item xs={6} sm={3}>
+                    </GridItem>
+                    <GridItem item xs={6} sm={3}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -459,8 +485,8 @@ export default function AmericanOptionsPricing() {
                           {criticalDisplay}
                         </Typography>
                       </Paper>
-                    </Grid>
-                    <Grid item xs={6} sm={3}>
+                    </GridItem>
+                    <GridItem item xs={6} sm={3}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -469,17 +495,15 @@ export default function AmericanOptionsPricing() {
                           Strike
                         </Typography>
                         <Typography variant="h6" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {result.inputs.K.toFixed
-                            ? result.inputs.K.toFixed(2)
-                            : result.inputs.K}
+                          {result.inputs.K.toFixed ? result.inputs.K.toFixed(2) : result.inputs.K}
                         </Typography>
                       </Paper>
-                    </Grid>
+                    </GridItem>
                   </Grid>
 
                   {result.greeks && (
                     <Grid container spacing={1.5} sx={{ mt: 1.5 }}>
-                      <Grid item xs={6} sm={4}>
+                      <GridItem item xs={6} sm={4}>
                         <Paper
                           variant="outlined"
                           sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -491,8 +515,8 @@ export default function AmericanOptionsPricing() {
                             {result.greeks.delta.toFixed(4)}
                           </Typography>
                         </Paper>
-                      </Grid>
-                      <Grid item xs={6} sm={4}>
+                      </GridItem>
+                      <GridItem item xs={6} sm={4}>
                         <Paper
                           variant="outlined"
                           sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -504,8 +528,8 @@ export default function AmericanOptionsPricing() {
                             {result.greeks.gamma.toFixed(6)}
                           </Typography>
                         </Paper>
-                      </Grid>
-                      <Grid item xs={6} sm={4}>
+                      </GridItem>
+                      <GridItem item xs={6} sm={4}>
                         <Paper
                           variant="outlined"
                           sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -517,8 +541,8 @@ export default function AmericanOptionsPricing() {
                             {result.greeks.theta.toFixed(4)}
                           </Typography>
                         </Paper>
-                      </Grid>
-                      <Grid item xs={6} sm={6}>
+                      </GridItem>
+                      <GridItem item xs={6} sm={6}>
                         <Paper
                           variant="outlined"
                           sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -530,8 +554,8 @@ export default function AmericanOptionsPricing() {
                             {result.greeks.vega.toFixed(4)}
                           </Typography>
                         </Paper>
-                      </Grid>
-                      <Grid item xs={6} sm={6}>
+                      </GridItem>
+                      <GridItem item xs={6} sm={6}>
                         <Paper
                           variant="outlined"
                           sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -543,7 +567,7 @@ export default function AmericanOptionsPricing() {
                             {result.greeks.rho.toFixed(4)}
                           </Typography>
                         </Paper>
-                      </Grid>
+                      </GridItem>
                     </Grid>
                   )}
 
@@ -558,7 +582,7 @@ export default function AmericanOptionsPricing() {
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                        FinanceBud's explanation
+                        FinanceBud&apos;s explanation
                       </Typography>
                       {assistantError && (
                         <Typography variant="body2" color="error" sx={{ mb: 1 }}>
@@ -637,7 +661,7 @@ export default function AmericanOptionsPricing() {
                 </Box>
               )}
             </Paper>
-          </Grid>
+          </GridItem>
         </Grid>
       </Container>
     </Box>

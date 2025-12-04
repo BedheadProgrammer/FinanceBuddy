@@ -1,9 +1,19 @@
-# optnstrdr/urls.py
 from django.urls import path
-from .views import HomeView  # or from .views import home if you used a function view
+
+from .views import (
+    HomeView,
+    option_trade_api,
+    option_positions_api,
+    option_trades_api,
+    option_snapshot_api,
+)
 
 app_name = "optnstrdr"
 
 urlpatterns = [
-    path("", HomeView.as_view(), name="home"),  # or path("", home, name="home"),
+    path("", HomeView.as_view(), name="home"),
+    path("api/options/trade/", option_trade_api, name="option_trade_api"),
+    path("api/options/positions/", option_positions_api, name="option_positions_api"),
+    path("api/options/trades/", option_trades_api, name="option_trades_api"),
+    path("api/options/snapshot/", option_snapshot_api, name="option_snapshot_api"),
 ]

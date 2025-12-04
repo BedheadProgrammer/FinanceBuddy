@@ -56,6 +56,13 @@ def register_view(request):
         email=email,
         password=password,
     )
-    # Log them in immediately after registration
-    login(request, user)
-    return JsonResponse({"ok": True, "username": user.username})
+
+    authed = authenticate(request, username=username, password=password)
+    if authed is None:
+        return JsonResponse(
+            {"error": "User created but could not authenticate."},
+            status=500,
+        )
+
+    login(request, authed)
+    return JsonResponse({"ok": True, "username": authed.username})

@@ -18,6 +18,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { usePageMeta } from "../hooks/usePageMeta";
 
+const GridItem = (props: any) => <Grid {...props} />;
+
 type EuroApiResponse = {
   inputs: {
     symbol: string;
@@ -242,7 +244,7 @@ export default function EuroOptionsPricing() {
         </Box>
 
         <Grid container spacing={3} justifyContent="center">
-          <Grid item xs={12} md={5}>
+          <GridItem item xs={12} md={5}>
             <Paper
               elevation={3}
               sx={{
@@ -277,7 +279,7 @@ export default function EuroOptionsPricing() {
                   </ToggleButtonGroup>
 
                   <Grid container spacing={1.5}>
-                    <Grid item xs={6}>
+                    <GridItem item xs={6}>
                       <TextField
                         label="Strike"
                         value={strike}
@@ -287,8 +289,8 @@ export default function EuroOptionsPricing() {
                         type="number"
                         inputProps={{ step: "0.01" }}
                       />
-                    </Grid>
-                    <Grid item xs={6}>
+                    </GridItem>
+                    <GridItem item xs={6}>
                       <TextField
                         label="Expiration"
                         type="date"
@@ -298,7 +300,7 @@ export default function EuroOptionsPricing() {
                         onChange={(e) => setExpiry(e.target.value)}
                         InputLabelProps={{ shrink: true }}
                       />
-                    </Grid>
+                    </GridItem>
                   </Grid>
 
                   <TextField
@@ -367,9 +369,9 @@ export default function EuroOptionsPricing() {
                 </Stack>
               </Box>
             </Paper>
-          </Grid>
+          </GridItem>
 
-          <Grid item xs={12} md={7}>
+          <GridItem item xs={12} md={7}>
             <Paper
               elevation={2}
               sx={{
@@ -458,7 +460,7 @@ export default function EuroOptionsPricing() {
                   </Box>
 
                   <Grid container spacing={1.5}>
-                    <Grid item xs={6} sm={4}>
+                    <GridItem item xs={6} sm={4}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -470,8 +472,8 @@ export default function EuroOptionsPricing() {
                           {data.price_and_greeks.delta.toFixed(4)}
                         </Typography>
                       </Paper>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
+                    </GridItem>
+                    <GridItem item xs={6} sm={4}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -483,8 +485,8 @@ export default function EuroOptionsPricing() {
                           {data.price_and_greeks.gamma.toFixed(6)}
                         </Typography>
                       </Paper>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
+                    </GridItem>
+                    <GridItem item xs={6} sm={4}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -496,8 +498,8 @@ export default function EuroOptionsPricing() {
                           {data.price_and_greeks.theta.toFixed(4)}
                         </Typography>
                       </Paper>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
+                    </GridItem>
+                    <GridItem item xs={6} sm={4}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -509,8 +511,8 @@ export default function EuroOptionsPricing() {
                           {data.price_and_greeks.vega.toFixed(4)}
                         </Typography>
                       </Paper>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
+                    </GridItem>
+                    <GridItem item xs={6} sm={4}>
                       <Paper
                         variant="outlined"
                         sx={{ p: 1.5, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.3)" }}
@@ -522,7 +524,7 @@ export default function EuroOptionsPricing() {
                           {data.price_and_greeks.rho.toFixed(4)}
                         </Typography>
                       </Paper>
-                    </Grid>
+                    </GridItem>
                   </Grid>
 
                   {assistantOpen && (
@@ -617,7 +619,7 @@ export default function EuroOptionsPricing() {
                 </Box>
               )}
             </Paper>
-          </Grid>
+          </GridItem>
         </Grid>
       </Container>
     </Box>
