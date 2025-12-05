@@ -9,12 +9,6 @@ import { useAuth } from '../store/auth'
 
 type FormValues = { username: string; password: string }
 
-const float = keyframes`
-  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
-  33% { transform: translateY(-30px) translateX(20px) rotate(120deg); }
-  66% { transform: translateY(20px) translateX(-20px) rotate(240deg); }
-`
-
 const gradientShift = keyframes`
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -58,51 +52,6 @@ export function Login() {
         },
       }}
     >
-      {/* Floating background shapes */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '10%',
-          left: '10%',
-          width: 300,
-          height: 300,
-          borderRadius: '50%',
-          background: 'rgba(124, 77, 255, 0.3)',
-          filter: 'blur(60px)',
-          animation: `${float} 20s ease-in-out infinite`,
-          '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          bottom: '20%',
-          right: '15%',
-          width: 400,
-          height: 400,
-          borderRadius: '50%',
-          background: 'rgba(0, 229, 255, 0.3)',
-          filter: 'blur(70px)',
-          animation: `${float} 25s ease-in-out infinite reverse`,
-          '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          width: 350,
-          height: 350,
-          borderRadius: '50%',
-          background: 'rgba(255, 64, 129, 0.2)',
-          filter: 'blur(80px)',
-          animation: `${float} 30s ease-in-out infinite`,
-          '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-        }}
-      />
-
-      {/* Glass card */}
       <Box
         sx={{
           position: 'relative',
@@ -116,14 +65,15 @@ export function Login() {
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+          transform: 'scale(0.75)',
           transition: 'transform 0.3s ease, box-shadow 0.3s ease',
           '&:hover': {
-            transform: 'translateY(-4px)',
+            transform: 'scale(0.75) translateY(-4px)',
             boxShadow: '0 12px 48px 0 rgba(31, 38, 135, 0.5)',
           },
           '@media (prefers-reduced-motion: reduce)': {
             transition: 'none',
-            '&:hover': { transform: 'none' },
+            '&:hover': { transform: 'scale(0.75)' },
           },
         }}
       >

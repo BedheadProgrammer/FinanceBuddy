@@ -1,0 +1,2 @@
+GET http://127.0.0.1:8000/api/euro/price/?symbol=SHEL&side=CALL&strike=73&expiry=2026-01-17&vol_mode=HIST
+Accept: application/json
