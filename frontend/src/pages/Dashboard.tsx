@@ -72,11 +72,17 @@ export function Dashboard() {
 
   useEffect(() => {
     fetchPrices(symbols);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+    <Box
+      sx={{
+        maxWidth: 1400,
+        mx: 'auto',
+        transform: 'scale(0.75)',
+        transformOrigin: 'top center',
+      }}
+    >
       <Box
         sx={{
           textAlign: 'center',
@@ -151,25 +157,25 @@ export function Dashboard() {
             </Typography>
 
             <Stack spacing={2}>
-             <TextField
-  fullWidth
-  label="Stock symbols"
-  placeholder="AAPL, MSFT, GOOGL"
-  value={symbols}
-  onChange={(e) => setSymbols(e.target.value)}
-  sx={{
-    '& .MuiOutlinedInput-root': {
-      backgroundColor: '#ffffff',
-      color: 'rgba(15, 23, 42, 0.95)',
-      '& fieldset': {
-        borderColor: 'rgba(15, 23, 42, 0.15)',
-      },
-      '&:hover fieldset': {
-        borderColor: 'rgba(15, 23, 42, 0.3)',
-      },
-    },
-  }}
-/>
+              <TextField
+                fullWidth
+                label="Stock symbols"
+                placeholder="AAPL, MSFT, GOOGL"
+                value={symbols}
+                onChange={(e) => setSymbols(e.target.value)}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: '#ffffff',
+                    color: 'rgba(15, 23, 42, 0.95)',
+                    '& fieldset': {
+                      borderColor: 'rgba(15, 23, 42, 0.15)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'rgba(15, 23, 42, 0.3)',
+                    },
+                  },
+                }}
+              />
 
               <Button
                 onClick={() => fetchPrices(symbols)}

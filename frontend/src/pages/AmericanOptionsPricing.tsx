@@ -183,7 +183,8 @@ export default function AmericanOptionsPricing() {
       expiry,
       vol_mode: volMode,
     });
-    if (volMode === "IV" && marketOptionPrice.trim()) params.set("market_option_price", marketOptionPrice.trim());
+    if (volMode === "IV" && marketOptionPrice.trim())
+      params.set("market_option_price", marketOptionPrice.trim());
     if (constantVol.trim()) params.set("constant_vol", constantVol.trim());
     if (useQL) params.set("use_quantlib_daycount", "true");
 
@@ -220,14 +221,21 @@ export default function AmericanOptionsPricing() {
 
   return (
     <Box sx={{ py: 6 }}>
-      <Container maxWidth="lg">
+      <Container
+        maxWidth="lg"
+        sx={{
+          transform: "scale(0.8)",
+          transformOrigin: "top center",
+        }}
+      >
         <Grid container spacing={4}>
           <GridItem item xs={12} md={5}>
             <Paper
               sx={{
                 p: 3,
                 borderRadius: 3,
-                background: "radial-gradient(circle at top left, #1e293b 0%, #020617 55%, #000 100%)",
+                background:
+                  "radial-gradient(circle at top left, #1e293b 0%, #020617 55%, #000 100%)",
                 border: "1px solid rgba(148,163,184,0.4)",
                 boxShadow: "0 18px 60px rgba(15,23,42,0.9)",
               }}
@@ -241,8 +249,8 @@ export default function AmericanOptionsPricing() {
                     American option calculator
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Price an American call or put using the Barone-Adesi Whaley approximation with live
-                    market inputs.
+                    Price an American call or put using the Barone-Adesi Whaley approximation with
+                    live market inputs.
                   </Typography>
                 </Box>
 
@@ -402,7 +410,8 @@ export default function AmericanOptionsPricing() {
               {!hasResult ? (
                 <Box sx={{ py: 6, textAlign: "center" }}>
                   <Typography variant="body1" color="text.secondary">
-                    Run a calculation to see American vs. European price, early exercise premium, and Greeks.
+                    Run a calculation to see American vs. European price, early exercise premium, and
+                    Greeks.
                   </Typography>
                 </Box>
               ) : (
@@ -440,7 +449,11 @@ export default function AmericanOptionsPricing() {
                       >
                         {result.inputs.as_of}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 0.5, display: "block" }}
+                      >
                         Exp: {result.inputs.expiry}
                       </Typography>
                     </Box>
@@ -597,11 +610,13 @@ export default function AmericanOptionsPricing() {
                           pr: 1,
                         }}
                       >
-                        {assistantMessages.length === 0 && !assistantLoading && !assistantError && (
-                          <Typography variant="body2" color="text.secondary">
-                            Click "View details" to ask FinanceBud about this American option run.
-                          </Typography>
-                        )}
+                        {assistantMessages.length === 0 &&
+                          !assistantLoading &&
+                          !assistantError && (
+                            <Typography variant="body2" color="text.secondary">
+                              Click "View details" to ask FinanceBud about this American option run.
+                            </Typography>
+                          )}
                         {assistantMessages.map((msg) => (
                           <Box
                             key={msg.id}

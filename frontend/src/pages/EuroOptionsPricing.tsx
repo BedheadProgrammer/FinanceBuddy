@@ -233,7 +233,13 @@ export default function EuroOptionsPricing() {
         py: 4,
       }}
     >
-      <Container maxWidth="lg">
+      <Container
+        maxWidth="lg"
+        sx={{
+          transform: "scale(0.8)",
+          transformOrigin: "top center",
+        }}
+      >
         <Box sx={{ mb: 4, textAlign: "center" }}>
           <Typography variant="h4" fontWeight={700}>
             European Option Calculator
