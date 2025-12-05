@@ -12,6 +12,7 @@ from .models import (
     OptionPosition,
     OptionTrade,
     OptionValuationSnapshot,
+    OptionExercise,
 )
 
 
@@ -208,3 +209,87 @@ def snapshot_option_valuation(
         source=source,
     )
     return snapshot
+
+
+@transaction.atomic
+def exercise_option_contract(
+    portfolio: Portfolio,
+    *,
+    underlying_symbol: str,
+    option_side: str,
+    option_style: str,
+    strike: Decimal,
+    expiry,
+    quantity: Decimal,
+    underlying_price: Decimal,
+    fees: Decimal = Decimal("0"),
+) -> OptionExercise:
+    if quantity <= 0:
+        raise ValueError("Exercise quantity must be positive.")
+
+    underlying_symbol = underlying_symbol.upper().strip()
+    option_side = option_side.upper().strip()
+    option_style = option_style.upper().strip()
+
+    contract = (
+        OptionContract.objects.select_for_update()
+        .filter(
+            underlying_symbol=underlying_symbol,
+            option_side=option_side,
+            option_style=option_style,
+            strike=strike,
+            expiry=expiry,
+        )
+        .first()
+    )
+    if contract is None:
+        raise ValueError("No existing option contract found for exercise.")
+
+    position = (
+        OptionPosition.objects.select_for_update()
+        .filter(portfolio=portfolio, contract=contract)
+        .first()
+    )
+    if position is None or position.quantity <= 0 or quantity > position.quantity:
+        raise ValueError("Cannot exercise more contracts than currently held for long-only positions.")
+
+    if contract.option_side == "CALL":
+        intrinsic_value_per_contract = max(underlying_price - contract.strike, Decimal("0"))
+    elif contract.option_side == "PUT":
+        intrinsic_value_per_contract = max(contract.strike - underlying_price, Decimal("0"))
+    else:
+        raise ValueError("Unknown option side for exercise.")
+
+    intrinsic_value_total = intrinsic_value_per_contract * quantity * contract.multiplier
+    option_realized_pl = (
+        (intrinsic_value_per_contract - position.avg_cost)
+        * quantity
+        * contract.multiplier
+    )
+
+    cash_delta = intrinsic_value_total - fees
+
+    remaining_quantity = position.quantity - quantity
+    if remaining_quantity == 0:
+        position.delete()
+        position = None
+    else:
+        position.quantity = remaining_quantity
+        position.last_updated = timezone.now()
+        position.save(update_fields=["quantity", "last_updated"])
+
+    portfolio.cash_balance = portfolio.cash_balance + cash_delta
+    portfolio.save(update_fields=["cash_balance"])
+
+    exercise = OptionExercise.objects.create(
+        portfolio=portfolio,
+        contract=contract,
+        quantity=quantity,
+        underlying_price_at_exercise=underlying_price,
+        intrinsic_value_per_contract=intrinsic_value_per_contract,
+        intrinsic_value_total=intrinsic_value_total,
+        option_realized_pl=option_realized_pl,
+        cash_delta=cash_delta,
+    )
+
+    return exercise

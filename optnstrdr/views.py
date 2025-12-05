@@ -15,8 +15,8 @@ from django.views.decorators.http import require_GET, require_POST
 from BE1.MRKT_WTCH import get_current_prices, POPULAR
 
 from api.models import Portfolio
-from .models import OptionPosition, OptionTrade, OptionContract
-from .services import apply_option_trade, snapshot_option_valuation
+from .models import OptionPosition, OptionTrade, OptionContract, OptionExercise
+from .services import apply_option_trade, snapshot_option_valuation, exercise_option_contract
 
 
 class HomeView(LoginRequiredMixin, View):
@@ -350,6 +350,107 @@ def option_snapshot_api(request: HttpRequest) -> JsonResponse:
             "vega": str(snapshot.vega) if snapshot.vega is not None else None,
             "rho": str(snapshot.rho) if snapshot.rho is not None else None,
             "source": snapshot.source,
+        }
+        return JsonResponse(data, status=201)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+
+@csrf_exempt
+@require_POST
+def option_exercise_api(request: HttpRequest) -> JsonResponse:
+    try:
+        payload = json.loads(request.body.decode() or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    try:
+        portfolio = _get_portfolio(payload.get("portfolio_id"))
+
+        symbol = (payload.get("symbol") or "").upper().strip()
+        if not symbol:
+            raise ValueError("symbol is required")
+
+        option_side = (payload.get("option_side") or "").upper().strip()
+        option_style = (payload.get("option_style") or "").upper().strip()
+        if option_side not in ("CALL", "PUT"):
+            raise ValueError("option_side must be CALL or PUT")
+        if option_style not in ("EUROPEAN", "AMERICAN"):
+            raise ValueError("option_style must be EUROPEAN or AMERICAN")
+
+        strike = _parse_decimal(payload.get("strike"), "strike")
+        expiry = _parse_date(payload.get("expiry"), "expiry")
+
+        quantity = _parse_decimal(payload.get("quantity"), "quantity")
+        if quantity <= 0:
+            raise ValueError("quantity must be positive")
+
+        underlying_price_raw = payload.get("underlying_price")
+        if underlying_price_raw is None:
+            raise ValueError("underlying_price is required")
+        underlying_price = _parse_decimal(underlying_price_raw, "underlying_price")
+
+        fees_raw = payload.get("fees", "0")
+        fees = _parse_decimal(fees_raw, "fees")
+
+        exercise = exercise_option_contract(
+            portfolio=portfolio,
+            underlying_symbol=symbol,
+            option_side=option_side,
+            option_style=option_style,
+            strike=strike,
+            expiry=expiry,
+            quantity=quantity,
+            underlying_price=underlying_price,
+            fees=fees,
+        )
+
+        contract = exercise.contract
+        position = (
+            OptionPosition.objects.filter(
+                portfolio=portfolio,
+                contract=contract,
+            )
+            .only("id", "quantity", "avg_cost")
+            .first()
+        )
+
+        position_payload = None
+        if position is not None:
+            position_payload = {
+                "id": position.id,
+                "quantity": str(position.quantity),
+                "avg_cost": str(position.avg_cost),
+            }
+
+        data = {
+            "exercise": {
+                "id": exercise.id,
+                "portfolio_id": portfolio.id,
+                "contract_id": contract.id,
+                "quantity": str(exercise.quantity),
+                "underlying_price_at_exercise": str(exercise.underlying_price_at_exercise),
+                "intrinsic_value_per_contract": str(exercise.intrinsic_value_per_contract),
+                "intrinsic_value_total": str(exercise.intrinsic_value_total),
+                "option_realized_pl": str(exercise.option_realized_pl),
+                "cash_delta": str(exercise.cash_delta),
+                "exercised_at": exercise.exercised_at.isoformat(),
+            },
+            "contract": {
+                "id": contract.id,
+                "underlying_symbol": contract.underlying_symbol,
+                "option_side": contract.option_side,
+                "option_style": contract.option_style,
+                "strike": str(contract.strike),
+                "expiry": contract.expiry.isoformat(),
+                "multiplier": contract.multiplier,
+                "contract_symbol": contract.contract_symbol,
+            },
+            "portfolio": {
+                "id": portfolio.id,
+                "cash": str(portfolio.cash_balance),
+            },
+            "position": position_payload,
         }
         return JsonResponse(data, status=201)
     except ValueError as exc:

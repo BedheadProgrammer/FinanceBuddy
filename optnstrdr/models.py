@@ -43,6 +43,39 @@ class OptionContract(models.Model):
             return base + " (Am)"
         return base + " (Eu)"
 
+class OptionExercise(models.Model):
+    portfolio = models.ForeignKey(
+        "api.Portfolio",
+        on_delete=models.CASCADE,
+        related_name="option_exercises",
+    )
+    contract = models.ForeignKey(
+        OptionContract,
+        on_delete=models.CASCADE,
+        related_name="exercises",
+    )
+    quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    underlying_price_at_exercise = models.DecimalField(max_digits=18, decimal_places=4)
+    intrinsic_value_per_contract = models.DecimalField(max_digits=18, decimal_places=4)
+    intrinsic_value_total = models.DecimalField(max_digits=18, decimal_places=4)
+    option_realized_pl = models.DecimalField(max_digits=18, decimal_places=4)
+    cash_delta = models.DecimalField(max_digits=18, decimal_places=4)
+    exercised_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["portfolio", "exercised_at"]),
+            models.Index(fields=["contract", "exercised_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Exercise {self.quantity} {self.contract} in {self.portfolio} @ {self.underlying_price_at_exercise}"
+
+
+
+
+
 
 class OptionPosition(models.Model):
     portfolio = models.ForeignKey(
