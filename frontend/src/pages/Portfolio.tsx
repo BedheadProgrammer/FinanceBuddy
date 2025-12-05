@@ -915,7 +915,7 @@ export default function Portfolio() {
                   </Grid>
 
                   <Typography variant="caption" color="text.secondary">
-                    Leave price blank to use the live market price from the data provider.
+                    Leave price blank to use the live market data.
                   </Typography>
 
                   <Button
