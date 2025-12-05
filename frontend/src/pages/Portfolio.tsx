@@ -16,6 +16,8 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  Collapse,
+  Slider,
 } from "@mui/material";
 import { usePageMeta } from "../hooks/usePageMeta";
 
@@ -149,6 +151,41 @@ type OptionTradeResponse = {
   error?: string;
 };
 
+type OptionExerciseResponse = {
+  exercise: {
+    id: number;
+    portfolio_id: number;
+    contract_id: number;
+    quantity: string;
+    underlying_price_at_exercise: string;
+    intrinsic_value_per_contract: string;
+    intrinsic_value_total: string;
+    option_realized_pl: string;
+    cash_delta: string;
+    exercised_at: string;
+  };
+  contract: {
+    id: number;
+    underlying_symbol: string;
+    option_side: OptionSide;
+    option_style: OptionStyle;
+    strike: string;
+    expiry: string;
+    multiplier: number;
+    contract_symbol: string | null;
+  };
+  portfolio: {
+    id: number;
+    cash: string;
+  };
+  position: {
+    id: number;
+    quantity: string;
+    avg_cost: string;
+  } | null;
+  error?: string;
+};
+
 export default function Portfolio() {
   usePageMeta("Portfolio | FinanceBuddy", "Virtual Stock Exchange Portfolio");
 
@@ -157,13 +194,18 @@ export default function Portfolio() {
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const [tradeSymbol, setTradeSymbol] = useState("AAPL");
-  const [tradeSide, setTradeSide] = useState<TradeSide>("BUY");
   const [tradeQuantity, setTradeQuantity] = useState("10");
   const [tradePrice, setTradePrice] = useState("");
   const [useMarketPrice, setUseMarketPrice] = useState(true);
   const [tradeLoading, setTradeLoading] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [tradeSuccess, setTradeSuccess] = useState<string | null>(null);
+
+  const [sellStockSymbol, setSellStockSymbol] = useState<string | null>(null);
+  const [sellStockQuantity, setSellStockQuantity] = useState<number>(0);
+  const [sellStockLoading, setSellStockLoading] = useState(false);
+  const [sellStockError, setSellStockError] = useState<string | null>(null);
+  const [sellStockSuccess, setSellStockSuccess] = useState<string | null>(null);
 
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
@@ -172,7 +214,6 @@ export default function Portfolio() {
   const [assistantError, setAssistantError] = useState<string | null>(null);
 
   const [optionSymbol, setOptionSymbol] = useState("AAPL");
-  const [optionTradeSide, setOptionTradeSide] = useState<TradeSide>("BUY");
   const [optionSide, setOptionSide] = useState<OptionSide>("CALL");
   const [optionStyle, setOptionStyle] = useState<OptionStyle>("AMERICAN");
   const [optionStrike, setOptionStrike] = useState("");
@@ -185,6 +226,16 @@ export default function Portfolio() {
   const [optionPositions, setOptionPositions] = useState<OptionPosition[]>([]);
   const [optionPositionsLoading, setOptionPositionsLoading] = useState(false);
   const [optionPositionsError, setOptionPositionsError] = useState<string | null>(null);
+
+  const [optionExerciseLoadingId, setOptionExerciseLoadingId] = useState<number | null>(null);
+  const [optionExerciseError, setOptionExerciseError] = useState<string | null>(null);
+  const [optionExerciseSuccess, setOptionExerciseSuccess] = useState<string | null>(null);
+
+  const [sellOptionId, setSellOptionId] = useState<number | null>(null);
+  const [sellOptionQuantity, setSellOptionQuantity] = useState<number>(0);
+  const [sellOptionLoading, setSellOptionLoading] = useState(false);
+  const [sellOptionError, setSellOptionError] = useState<string | null>(null);
+  const [sellOptionSuccess, setSellOptionSuccess] = useState<string | null>(null);
 
   async function fetchSummary() {
     setSummaryError(null);
@@ -269,7 +320,7 @@ export default function Portfolio() {
 
     const body: any = {
       symbol: tradeSymbol.trim().toUpperCase(),
-      side: tradeSide,
+      side: "BUY" as TradeSide,
       quantity: Number(quantityTrimmed),
     };
 
@@ -295,9 +346,7 @@ export default function Portfolio() {
         setTradeError(msg);
       } else {
         setTradeSuccess(
-          `${json.trade.side} ${json.trade.quantity} ${json.trade.symbol} @ ${json.trade.price.toFixed(
-            2
-          )}`
+          `Bought ${json.trade.quantity} ${json.trade.symbol} @ ${json.trade.price.toFixed(2)}`
         );
         setTradeQuantity("10");
         if (!useMarketPrice) {
@@ -309,6 +358,52 @@ export default function Portfolio() {
       setTradeError(err?.message || "Trade failed.");
     } finally {
       setTradeLoading(false);
+    }
+  }
+
+  async function handleSellStock(symbol: string, quantity: number) {
+    setSellStockError(null);
+    setSellStockSuccess(null);
+
+    if (quantity <= 0) {
+      setSellStockError("Quantity must be greater than 0.");
+      return;
+    }
+
+    const body: any = {
+      symbol: symbol.toUpperCase(),
+      side: "SELL" as TradeSide,
+      quantity: quantity,
+    };
+
+    setSellStockLoading(true);
+    try {
+      const res = await fetch("/api/portfolio/trade/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as TradeResponse;
+
+      if (!res.ok || !json.ok) {
+        const msg = json.error || (json as any).error || "Sell failed.";
+        setSellStockError(msg);
+      } else {
+        setSellStockSuccess(
+          `Sold ${json.trade.quantity} ${json.trade.symbol} @ ${json.trade.price.toFixed(2)}`
+        );
+        setSellStockSymbol(null);
+        setSellStockQuantity(0);
+        await fetchSummary();
+      }
+    } catch (err: any) {
+      setSellStockError(err?.message || "Sell failed.");
+    } finally {
+      setSellStockLoading(false);
     }
   }
 
@@ -399,7 +494,7 @@ export default function Portfolio() {
         expiry: expiryTrimmed,
         quantity: quantityNum,
         price: fairPrice,
-        side: optionTradeSide,
+        side: "BUY" as TradeSide,
       };
 
       const res = await fetch("/api/options/trade/", {
@@ -420,7 +515,7 @@ export default function Portfolio() {
         const contract = json.contract;
         const trade = json.trade;
         setOptionTradeSuccess(
-          `${trade.side} ${Number(trade.quantity)} ${contract.underlying_symbol} ${contract.option_side} ` +
+          `Bought ${Number(trade.quantity)} ${contract.underlying_symbol} ${contract.option_side} ` +
             `@ strike ${Number(contract.strike).toFixed(2)} exp ${contract.expiry}`
         );
         setOptionQuantity("1");
@@ -431,6 +526,188 @@ export default function Portfolio() {
       setOptionTradeError(err?.message || "Options trade failed.");
     } finally {
       setOptionTradeLoading(false);
+    }
+  }
+
+  async function handleSellOption(pos: OptionPosition, quantity: number) {
+    setSellOptionError(null);
+    setSellOptionSuccess(null);
+
+    if (!summary) {
+      setSellOptionError("Portfolio is not loaded yet.");
+      return;
+    }
+
+    if (quantity <= 0) {
+      setSellOptionError("Quantity must be greater than 0.");
+      return;
+    }
+
+    setSellOptionLoading(true);
+    try {
+      const symbolUpper = pos.underlying_symbol.toUpperCase();
+
+      const params = new URLSearchParams({
+        symbol: symbolUpper,
+        side: pos.option_side,
+        strike: pos.strike.toString(),
+        expiry: pos.expiry,
+      });
+
+      const quoteUrl =
+        pos.option_style === "EUROPEAN"
+          ? `/api/euro/price/?${params.toString()}`
+          : `/api/american/price/?${params.toString()}`;
+
+      const quoteResp = await fetch(quoteUrl, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      });
+      const quoteJson = await quoteResp.json();
+
+      if (!quoteResp.ok || (quoteJson as any).error) {
+        const msg = (quoteJson as any).error || "Failed to calculate option fair value.";
+        setSellOptionError(msg);
+        return;
+      }
+
+      let fairPrice: number;
+
+      if (pos.option_style === "EUROPEAN") {
+        const greeks = (quoteJson as any).price_and_greeks;
+        fairPrice = Number(greeks?.fair_value);
+      } else {
+        const americanResult = (quoteJson as any).american_result;
+        fairPrice = Number(americanResult?.american_price);
+      }
+
+      if (!Number.isFinite(fairPrice) || fairPrice <= 0) {
+        setSellOptionError("Could not compute a valid fair value for this option.");
+        return;
+      }
+
+      const body = {
+        portfolio_id: summary.portfolio.id,
+        symbol: symbolUpper,
+        option_side: pos.option_side,
+        option_style: pos.option_style,
+        strike: pos.strike,
+        expiry: pos.expiry,
+        quantity: quantity,
+        price: fairPrice,
+        side: "SELL" as TradeSide,
+      };
+
+      const res = await fetch("/api/options/trade/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as OptionTradeResponse;
+
+      if (!res.ok || (json as any).error) {
+        const msg = json.error || (json as any).error || "Options sell failed.";
+        setSellOptionError(msg);
+      } else {
+        const contract = json.contract;
+        const trade = json.trade;
+        setSellOptionSuccess(
+          `Sold ${Number(trade.quantity)} ${contract.underlying_symbol} ${contract.option_side} ` +
+            `@ strike ${Number(contract.strike).toFixed(2)} exp ${contract.expiry}`
+        );
+        setSellOptionId(null);
+        setSellOptionQuantity(0);
+        await fetchSummary();
+        await fetchOptionPositions(summary.portfolio.id);
+      }
+    } catch (err: any) {
+      setSellOptionError(err?.message || "Options sell failed.");
+    } finally {
+      setSellOptionLoading(false);
+    }
+  }
+
+  async function handleExerciseOption(pos: OptionPosition) {
+    if (!summary) {
+      setOptionExerciseError("Portfolio is not loaded yet.");
+      return;
+    }
+
+    const underlyingSymbol = pos.underlying_symbol.toUpperCase();
+    const stockPos = summary.positions.find(
+      (p) => p.symbol.toUpperCase() === underlyingSymbol
+    );
+    const underlyingPrice = stockPos?.market_price;
+
+    if (
+      underlyingPrice === null ||
+      underlyingPrice === undefined ||
+      !Number.isFinite(underlyingPrice)
+    ) {
+      setOptionExerciseError(
+        `No valid market price available for ${underlyingSymbol}; cannot exercise this contract.`
+      );
+      return;
+    }
+
+    if (pos.quantity <= 0) {
+      setOptionExerciseError("No contracts available to exercise for this position.");
+      return;
+    }
+
+    setOptionExerciseError(null);
+    setOptionExerciseSuccess(null);
+    setOptionExerciseLoadingId(pos.id);
+
+    try {
+      const body = {
+        portfolio_id: summary.portfolio.id,
+        symbol: underlyingSymbol,
+        option_side: pos.option_side,
+        option_style: pos.option_style,
+        strike: pos.strike,
+        expiry: pos.expiry,
+        quantity: pos.quantity,
+        underlying_price: underlyingPrice,
+      };
+
+      const res = await fetch("/api/options/exercise/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(body),
+      });
+
+      const json = (await res.json()) as OptionExerciseResponse;
+
+      if (!res.ok || (json as any).error) {
+        const msg = json.error || (json as any).error || "Option exercise failed.";
+        setOptionExerciseError(msg);
+      } else {
+        const ex = json.exercise;
+        const contract = json.contract;
+        const intrinsicPer = Number(ex.intrinsic_value_per_contract);
+        const intrinsicTotal = Number(ex.intrinsic_value_total);
+        setOptionExerciseSuccess(
+          `Exercised ${Number(ex.quantity)} ${contract.underlying_symbol} ${contract.option_side} ` +
+            `@ strike ${Number(contract.strike).toFixed(2)} for intrinsic ${intrinsicPer.toFixed(
+              2
+            )} (${intrinsicTotal.toFixed(2)} total).`
+        );
+        await fetchSummary();
+        await fetchOptionPositions(summary.portfolio.id);
+      }
+    } catch (err: any) {
+      setOptionExerciseError(err?.message || "Option exercise failed.");
+    } finally {
+      setOptionExerciseLoadingId(null);
     }
   }
 
@@ -591,7 +868,7 @@ export default function Portfolio() {
               }}
             >
               <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                Place trade
+                Buy stock
               </Typography>
               <Box component="form" onSubmit={handleSubmitTrade}>
                 <Stack spacing={2.5}>
@@ -602,16 +879,6 @@ export default function Portfolio() {
                     size="small"
                     fullWidth
                   />
-                  <ToggleButtonGroup
-                    color="primary"
-                    value={tradeSide}
-                    exclusive
-                    onChange={(_, val) => val && setTradeSide(val)}
-                    size="small"
-                  >
-                    <ToggleButton value="BUY">Buy</ToggleButton>
-                    <ToggleButton value="SELL">Sell</ToggleButton>
-                  </ToggleButtonGroup>
 
                   <Grid container spacing={1.5}>
                     <GridItem item xs={6}>
@@ -660,10 +927,14 @@ export default function Portfolio() {
                       borderRadius: 999,
                       textTransform: "none",
                       fontWeight: 600,
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                      },
                     }}
                     fullWidth
                   >
-                    {tradeLoading ? "Submitting trade…" : "Submit trade"}
+                    {tradeLoading ? "Buying…" : "Buy"}
                   </Button>
 
                   {tradeError && (
@@ -691,7 +962,7 @@ export default function Portfolio() {
               }}
             >
               <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                Place options trade
+                Buy options contract
               </Typography>
               <Box component="form" onSubmit={handleSubmitOptionTrade}>
                 <Stack spacing={2.5}>
@@ -702,17 +973,6 @@ export default function Portfolio() {
                     size="small"
                     fullWidth
                   />
-
-                  <ToggleButtonGroup
-                    color="primary"
-                    value={optionTradeSide}
-                    exclusive
-                    onChange={(_, val) => val && setOptionTradeSide(val)}
-                    size="small"
-                  >
-                    <ToggleButton value="BUY">Buy</ToggleButton>
-                    <ToggleButton value="SELL">Sell</ToggleButton>
-                  </ToggleButtonGroup>
 
                   <Grid container spacing={1.5}>
                     <GridItem item xs={6}>
@@ -796,10 +1056,14 @@ export default function Portfolio() {
                       borderRadius: 999,
                       textTransform: "none",
                       fontWeight: 600,
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                      },
                     }}
                     fullWidth
                   >
-                    {optionTradeLoading ? "Submitting options trade…" : "Submit options trade"}
+                    {optionTradeLoading ? "Buying…" : "Buy"}
                   </Button>
 
                   {optionTradeError && (
@@ -938,6 +1202,17 @@ export default function Portfolio() {
                     </Typography>
                   )}
 
+                  {sellStockError && (
+                    <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+                      {sellStockError}
+                    </Typography>
+                  )}
+                  {sellStockSuccess && (
+                    <Typography variant="body2" color="success.main" sx={{ mb: 2 }}>
+                      {sellStockSuccess}
+                    </Typography>
+                  )}
+
                   {summary.positions.length === 0 ? (
                     <Box sx={{ py: 3 }}>
                       <Typography variant="body2" color="text.secondary">
@@ -946,12 +1221,19 @@ export default function Portfolio() {
                     </Box>
                   ) : (
                     <Box sx={{ mt: 1 }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
                         Open stock positions
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mb: 1.5, display: "block" }}
+                      >
+                        Click a row to sell shares from that position
                       </Typography>
                       <Box
                         sx={{
-                          maxHeight: 360,
+                          maxHeight: 420,
                           overflowY: "auto",
                           borderRadius: 2,
                           border: "1px solid rgba(148,163,184,0.3)",
@@ -979,27 +1261,153 @@ export default function Portfolio() {
                                   : pnl < 0
                                   ? "#ef4444"
                                   : "text.primary";
+                              const isSelected = sellStockSymbol === pos.symbol;
+                              const maxQty = Math.floor(pos.quantity);
                               return (
-                                <TableRow key={pos.symbol}>
-                                  <TableCell>{pos.symbol}</TableCell>
-                                  <TableCell align="right">
-                                    {formatNumber(pos.quantity, 4)}
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    {formatMoney(pos.avg_cost, currency)}
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    {pos.error
-                                      ? "N/A"
-                                      : formatMoney(pos.market_price, currency)}
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    {formatMoney(pos.market_value, currency)}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ color }}>
-                                    {pnl === null ? "—" : formatMoney(pnl, currency)}
-                                  </TableCell>
-                                </TableRow>
+                                <React.Fragment key={pos.symbol}>
+                                  <TableRow
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        setSellStockSymbol(null);
+                                        setSellStockQuantity(0);
+                                      } else {
+                                        setSellStockSymbol(pos.symbol);
+                                        setSellStockQuantity(maxQty);
+                                        setSellStockError(null);
+                                        setSellStockSuccess(null);
+                                      }
+                                    }}
+                                    sx={{
+                                      cursor: "pointer",
+                                      backgroundColor: isSelected
+                                        ? "rgba(239, 68, 68, 0.1)"
+                                        : "transparent",
+                                      "&:hover": {
+                                        backgroundColor: isSelected
+                                          ? "rgba(239, 68, 68, 0.15)"
+                                          : "rgba(255,255,255,0.03)",
+                                      },
+                                      transition: "background-color 0.2s ease",
+                                    }}
+                                  >
+                                    <TableCell>{pos.symbol}</TableCell>
+                                    <TableCell align="right">
+                                      {formatNumber(pos.quantity, 4)}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                      {formatMoney(pos.avg_cost, currency)}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                      {pos.error ? "N/A" : formatMoney(pos.market_price, currency)}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                      {formatMoney(pos.market_value, currency)}
+                                    </TableCell>
+                                    <TableCell align="right" sx={{ color }}>
+                                      {pnl === null ? "—" : formatMoney(pnl, currency)}
+                                    </TableCell>
+                                  </TableRow>
+                                  <TableRow>
+                                    <TableCell
+                                      colSpan={6}
+                                      sx={{ p: 0, borderBottom: isSelected ? undefined : "none" }}
+                                    >
+                                      <Collapse in={isSelected} timeout="auto" unmountOnExit>
+                                        <Box
+                                          sx={{
+                                            p: 2,
+                                            backgroundColor: "rgba(239, 68, 68, 0.05)",
+                                            borderTop: "1px solid rgba(239, 68, 68, 0.2)",
+                                          }}
+                                        >
+                                          <Typography
+                                            variant="body2"
+                                            sx={{ mb: 1.5, fontWeight: 500 }}
+                                          >
+                                            Sell {pos.symbol}
+                                          </Typography>
+                                          <Box
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 2,
+                                              flexWrap: "wrap",
+                                            }}
+                                          >
+                                            <Box sx={{ flex: 1, minWidth: 140 }}>
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                              >
+                                                Shares to sell: {sellStockQuantity}
+                                              </Typography>
+                                              <Slider
+                                                value={sellStockQuantity}
+                                                onChange={(_, val) =>
+                                                  setSellStockQuantity(val as number)
+                                                }
+                                                min={1}
+                                                max={maxQty}
+                                                step={1}
+                                                marks={[
+                                                  { value: 1, label: "1" },
+                                                  { value: maxQty, label: String(maxQty) },
+                                                ]}
+                                                sx={{
+                                                  color: "#ef4444",
+                                                  "& .MuiSlider-thumb": {
+                                                    backgroundColor: "#ef4444",
+                                                  },
+                                                  "& .MuiSlider-track": {
+                                                    backgroundColor: "#ef4444",
+                                                  },
+                                                }}
+                                              />
+                                            </Box>
+                                            <TextField
+                                              size="small"
+                                              type="number"
+                                              value={sellStockQuantity}
+                                              onChange={(e) => {
+                                                const val = Math.min(
+                                                  Math.max(1, Number(e.target.value)),
+                                                  maxQty
+                                                );
+                                                setSellStockQuantity(val);
+                                              }}
+                                              inputProps={{ min: 1, max: maxQty, step: 1 }}
+                                              sx={{ width: 80 }}
+                                            />
+                                            <Button
+                                              variant="contained"
+                                              size="small"
+                                              disabled={
+                                                sellStockLoading || sellStockQuantity <= 0
+                                              }
+                                              onClick={() =>
+                                                handleSellStock(pos.symbol, sellStockQuantity)
+                                              }
+                                              sx={{
+                                                borderRadius: 999,
+                                                textTransform: "none",
+                                                fontWeight: 600,
+                                                background:
+                                                  "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                                                "&:hover": {
+                                                  background:
+                                                    "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                                                },
+                                                minWidth: 100,
+                                              }}
+                                            >
+                                              {sellStockLoading ? "Selling…" : "Sell"}
+                                            </Button>
+                                          </Box>
+                                        </Box>
+                                      </Collapse>
+                                    </TableCell>
+                                  </TableRow>
+                                </React.Fragment>
                               );
                             })}
                           </TableBody>
@@ -1009,7 +1417,7 @@ export default function Portfolio() {
                   )}
 
                   <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
                       Open option positions
                     </Typography>
 
@@ -1025,6 +1433,30 @@ export default function Portfolio() {
                       </Typography>
                     )}
 
+                    {optionExerciseError && (
+                      <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                        {optionExerciseError}
+                      </Typography>
+                    )}
+
+                    {optionExerciseSuccess && (
+                      <Typography variant="body2" color="success.main" sx={{ mb: 1 }}>
+                        {optionExerciseSuccess}
+                      </Typography>
+                    )}
+
+                    {sellOptionError && (
+                      <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                        {sellOptionError}
+                      </Typography>
+                    )}
+
+                    {sellOptionSuccess && (
+                      <Typography variant="body2" color="success.main" sx={{ mb: 1 }}>
+                        {sellOptionSuccess}
+                      </Typography>
+                    )}
+
                     {!optionPositionsLoading &&
                       !optionPositionsError &&
                       optionPositions.length === 0 && (
@@ -1036,57 +1468,217 @@ export default function Portfolio() {
                     {!optionPositionsLoading &&
                       !optionPositionsError &&
                       optionPositions.length > 0 && (
-                        <Box
-                          sx={{
-                            mt: 1,
-                            maxHeight: 260,
-                            overflowY: "auto",
-                            borderRadius: 2,
-                            border: "1px solid rgba(148,163,184,0.3)",
-                          }}
-                        >
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Contract</TableCell>
-                                <TableCell align="right">Side</TableCell>
-                                <TableCell align="right">Style</TableCell>
-                                <TableCell align="right">Strike</TableCell>
-                                <TableCell align="right">Expiry</TableCell>
-                                <TableCell align="right">Contracts</TableCell>
-                                <TableCell align="right">Avg cost</TableCell>
-                                <TableCell align="right">Total value</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {optionPositions.map((pos) => (
-                                <TableRow key={pos.id}>
-                                  <TableCell>{pos.underlying_symbol}</TableCell>
-                                  <TableCell align="right">{pos.option_side}</TableCell>
-                                  <TableCell align="right">
-                                    {pos.option_style === "AMERICAN" ? "American" : "European"}
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    {formatNumber(pos.strike, 2)}
-                                  </TableCell>
-                                  <TableCell align="right">{pos.expiry}</TableCell>
-                                  <TableCell align="right">
-                                    {formatNumber(pos.quantity, 4)}
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    {formatMoney(pos.avg_cost, currency)}
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    {formatMoney(
-                                      pos.avg_cost * pos.quantity * pos.multiplier,
-                                      currency
-                                    )}
-                                  </TableCell>
+                        <>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ mb: 1.5, display: "block" }}
+                          >
+                            Click a row to sell contracts from that position
+                          </Typography>
+                          <Box
+                            sx={{
+                              mt: 1,
+                              maxHeight: 320,
+                              overflowY: "auto",
+                              borderRadius: 2,
+                              border: "1px solid rgba(148,163,184,0.3)",
+                            }}
+                          >
+                            <Table size="small" stickyHeader>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Contract</TableCell>
+                                  <TableCell align="right">Side</TableCell>
+                                  <TableCell align="right">Style</TableCell>
+                                  <TableCell align="right">Strike</TableCell>
+                                  <TableCell align="right">Expiry</TableCell>
+                                  <TableCell align="right">Contracts</TableCell>
+                                  <TableCell align="right">Avg cost</TableCell>
+                                  <TableCell align="right">Total value</TableCell>
+                                  <TableCell align="right">Actions</TableCell>
                                 </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </Box>
+                              </TableHead>
+                              <TableBody>
+                                {optionPositions.map((pos) => {
+                                  const isSelected = sellOptionId === pos.id;
+                                  const maxQty = Math.floor(pos.quantity);
+                                  return (
+                                    <React.Fragment key={pos.id}>
+                                      <TableRow
+                                        onClick={() => {
+                                          if (isSelected) {
+                                            setSellOptionId(null);
+                                            setSellOptionQuantity(0);
+                                          } else {
+                                            setSellOptionId(pos.id);
+                                            setSellOptionQuantity(maxQty);
+                                            setSellOptionError(null);
+                                            setSellOptionSuccess(null);
+                                          }
+                                        }}
+                                        sx={{
+                                          cursor: "pointer",
+                                          backgroundColor: isSelected
+                                            ? "rgba(239, 68, 68, 0.1)"
+                                            : "transparent",
+                                          "&:hover": {
+                                            backgroundColor: isSelected
+                                              ? "rgba(239, 68, 68, 0.15)"
+                                              : "rgba(255,255,255,0.03)",
+                                          },
+                                          transition: "background-color 0.2s ease",
+                                        }}
+                                      >
+                                        <TableCell>{pos.underlying_symbol}</TableCell>
+                                        <TableCell align="right">{pos.option_side}</TableCell>
+                                        <TableCell align="right">
+                                          {pos.option_style === "AMERICAN" ? "American" : "European"}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {formatNumber(pos.strike, 2)}
+                                        </TableCell>
+                                        <TableCell align="right">{pos.expiry}</TableCell>
+                                        <TableCell align="right">
+                                          {formatNumber(pos.quantity, 4)}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {formatMoney(pos.avg_cost, currency)}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {formatMoney(
+                                            pos.avg_cost * pos.quantity * pos.multiplier,
+                                            currency
+                                          )}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleExerciseOption(pos);
+                                            }}
+                                            disabled={
+                                              optionExerciseLoadingId === pos.id ||
+                                              pos.quantity <= 0
+                                            }
+                                            sx={{ textTransform: "none", borderRadius: 999 }}
+                                          >
+                                            {optionExerciseLoadingId === pos.id
+                                              ? "Exercising…"
+                                              : "Exercise"}
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                      <TableRow>
+                                        <TableCell
+                                          colSpan={9}
+                                          sx={{ p: 0, borderBottom: isSelected ? undefined : "none" }}
+                                        >
+                                          <Collapse in={isSelected} timeout="auto" unmountOnExit>
+                                            <Box
+                                              sx={{
+                                                p: 2,
+                                                backgroundColor: "rgba(239, 68, 68, 0.05)",
+                                                borderTop: "1px solid rgba(239, 68, 68, 0.2)",
+                                              }}
+                                            >
+                                              <Typography
+                                                variant="body2"
+                                                sx={{ mb: 1.5, fontWeight: 500 }}
+                                              >
+                                                Sell {pos.underlying_symbol} {pos.option_side}{" "}
+                                                {formatNumber(pos.strike, 2)} {pos.expiry}
+                                              </Typography>
+                                              <Box
+                                                sx={{
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: 2,
+                                                  flexWrap: "wrap",
+                                                }}
+                                              >
+                                                <Box sx={{ flex: 1, minWidth: 140 }}>
+                                                  <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                  >
+                                                    Contracts to sell: {sellOptionQuantity}
+                                                  </Typography>
+                                                  <Slider
+                                                    value={sellOptionQuantity}
+                                                    onChange={(_, val) =>
+                                                      setSellOptionQuantity(val as number)
+                                                    }
+                                                    min={1}
+                                                    max={maxQty}
+                                                    step={1}
+                                                    marks={[
+                                                      { value: 1, label: "1" },
+                                                      { value: maxQty, label: String(maxQty) },
+                                                    ]}
+                                                    sx={{
+                                                      color: "#ef4444",
+                                                      "& .MuiSlider-thumb": {
+                                                        backgroundColor: "#ef4444",
+                                                      },
+                                                      "& .MuiSlider-track": {
+                                                        backgroundColor: "#ef4444",
+                                                      },
+                                                    }}
+                                                  />
+                                                </Box>
+                                                <TextField
+                                                  size="small"
+                                                  type="number"
+                                                  value={sellOptionQuantity}
+                                                  onChange={(e) => {
+                                                    const val = Math.min(
+                                                      Math.max(1, Number(e.target.value)),
+                                                      maxQty
+                                                    );
+                                                    setSellOptionQuantity(val);
+                                                  }}
+                                                  inputProps={{ min: 1, max: maxQty, step: 1 }}
+                                                  sx={{ width: 80 }}
+                                                />
+                                                <Button
+                                                  variant="contained"
+                                                  size="small"
+                                                  disabled={
+                                                    sellOptionLoading || sellOptionQuantity <= 0
+                                                  }
+                                                  onClick={() =>
+                                                    handleSellOption(pos, sellOptionQuantity)
+                                                  }
+                                                  sx={{
+                                                    borderRadius: 999,
+                                                    textTransform: "none",
+                                                    fontWeight: 600,
+                                                    background:
+                                                      "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                                                    "&:hover": {
+                                                      background:
+                                                        "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                                                    },
+                                                    minWidth: 100,
+                                                  }}
+                                                >
+                                                  {sellOptionLoading ? "Selling…" : "Sell"}
+                                                </Button>
+                                              </Box>
+                                            </Box>
+                                          </Collapse>
+                                        </TableCell>
+                                      </TableRow>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </Box>
+                        </>
                       )}
                   </Box>
 
