@@ -1,12 +1,17 @@
+// frontend/src/hooks/useStockTrade.ts
+
 import { useState } from "react";
 import type { TradeSide, TradeResponse } from "../types/portfolio";
 
-
 type UseStockTradeOptions = {
+  portfolioId?: number | null;
   onSuccess?: () => void;
 };
 
-export function useStockTrade({ onSuccess }: UseStockTradeOptions = {}) {
+export function useStockTrade({
+  portfolioId,
+  onSuccess,
+}: UseStockTradeOptions = {}) {
   const [symbol, setSymbol] = useState("AAPL");
   const [quantity, setQuantity] = useState("10");
   const [price, setPrice] = useState("");
@@ -15,25 +20,45 @@ export function useStockTrade({ onSuccess }: UseStockTradeOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  async function handleSubmitTrade(e: React.FormEvent) {
-    e.preventDefault();
+  const resetStatus = () => {
     setError(null);
     setSuccess(null);
+  };
 
+  async function handleSubmitTrade() {
+    resetStatus();
+
+    const symbolTrimmed = symbol.trim().toUpperCase();
     const quantityTrimmed = quantity.trim();
-    if (!symbol.trim() || !quantityTrimmed) {
-      setError("Symbol and quantity are required.");
+
+    if (!symbolTrimmed) {
+      setError("Symbol is required.");
+      return;
+    }
+
+    const qtyNum = Number(quantityTrimmed);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      setError("Quantity must be a positive number.");
       return;
     }
 
     const body: any = {
-      symbol: symbol.trim().toUpperCase(),
+      symbol: symbolTrimmed,
       side: "BUY" as TradeSide,
-      quantity: Number(quantityTrimmed),
+      quantity: qtyNum,
     };
 
     if (!useMarketPrice && price.trim()) {
-      body.price = Number(price.trim());
+      const priceNum = Number(price.trim());
+      if (!Number.isFinite(priceNum) || priceNum <= 0) {
+        setError("Limit price must be a positive number.");
+        return;
+      }
+      body.price = priceNum;
+    }
+
+    if (portfolioId != null) {
+      body.portfolio_id = portfolioId;
     }
 
     setLoading(true);
@@ -47,19 +72,18 @@ export function useStockTrade({ onSuccess }: UseStockTradeOptions = {}) {
         credentials: "same-origin",
         body: JSON.stringify(body),
       });
-      const json = (await res.json()) as TradeResponse;
 
-      if (!res.ok || !json.ok) {
-        const msg = json.error || (json as any).error || "Trade failed.";
+      const json = (await res.json()) as TradeResponse & { error?: string };
+
+      if (!res.ok || json.error) {
+        const msg = json.error || "Trade failed.";
         setError(msg);
       } else {
         setSuccess(
-          `Bought ${json.trade.quantity} ${json.trade.symbol} @ $${json.trade.price.toFixed(2)}`
+          `Bought ${json.trade.quantity} ${json.trade.symbol} @ $${json.trade.price.toFixed(
+            2,
+          )}`,
         );
-        setQuantity("10");
-        if (!useMarketPrice) {
-          setPrice("");
-        }
         onSuccess?.();
       }
     } catch (err: any) {
@@ -85,16 +109,35 @@ export function useStockTrade({ onSuccess }: UseStockTradeOptions = {}) {
   };
 }
 
-export function useSellStock({ onSuccess }: UseStockTradeOptions = {}) {
+export function useSellStock({
+  portfolioId,
+  onSuccess,
+}: UseStockTradeOptions = {}) {
   const [sellSymbol, setSellSymbol] = useState<string | null>(null);
   const [sellQuantity, setSellQuantity] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  async function handleSellStock(symbol: string, quantity: number) {
+  const resetStatus = () => {
     setError(null);
     setSuccess(null);
+  };
+
+  function selectPosition(symbol: string, quantity: number) {
+    resetStatus();
+    setSellSymbol(symbol);
+    setSellQuantity(quantity);
+  }
+
+  function clearSelection() {
+    resetStatus();
+    setSellSymbol(null);
+    setSellQuantity(0);
+  }
+
+  async function handleSellStock(symbol: string, quantity: number) {
+    resetStatus();
 
     if (quantity <= 0) {
       setError("Quantity must be greater than 0.");
@@ -104,8 +147,12 @@ export function useSellStock({ onSuccess }: UseStockTradeOptions = {}) {
     const body: any = {
       symbol: symbol.toUpperCase(),
       side: "SELL" as TradeSide,
-      quantity: quantity,
+      quantity,
     };
+
+    if (portfolioId != null) {
+      body.portfolio_id = portfolioId;
+    }
 
     setLoading(true);
     try {
@@ -118,14 +165,17 @@ export function useSellStock({ onSuccess }: UseStockTradeOptions = {}) {
         credentials: "same-origin",
         body: JSON.stringify(body),
       });
-      const json = (await res.json()) as TradeResponse;
 
-      if (!res.ok || !json.ok) {
-        const msg = json.error || (json as any).error || "Sell failed.";
+      const json = (await res.json()) as TradeResponse & { error?: string };
+
+      if (!res.ok || json.error) {
+        const msg = json.error || "Sell failed.";
         setError(msg);
       } else {
         setSuccess(
-          `Sold ${json.trade.quantity} ${json.trade.symbol} @ $${json.trade.price.toFixed(2)}`
+          `Sold ${json.trade.quantity} ${json.trade.symbol} @ $${json.trade.price.toFixed(
+            2,
+          )}`,
         );
         setSellSymbol(null);
         setSellQuantity(0);
@@ -137,18 +187,6 @@ export function useSellStock({ onSuccess }: UseStockTradeOptions = {}) {
       setLoading(false);
     }
   }
-
-  const selectPosition = (symbol: string, maxQty: number) => {
-    setSellSymbol(symbol);
-    setSellQuantity(maxQty);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const clearSelection = () => {
-    setSellSymbol(null);
-    setSellQuantity(0);
-  };
 
   return {
     sellSymbol,

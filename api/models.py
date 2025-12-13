@@ -2,7 +2,6 @@ from django.db import models
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import models
 from django.utils import timezone
 
 
@@ -16,12 +15,45 @@ class Portfolio(models.Model):
     initial_cash = models.DecimalField(max_digits=18, decimal_places=2)
     cash_balance = models.DecimalField(max_digits=18, decimal_places=2)
     currency = models.CharField(max_length=3, default="USD")
+
     is_active = models.BooleanField(default=True)
+
+    is_default = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(is_default=True, archived_at__isnull=True),
+                name="unique_default_portfolio_per_user",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.user.username} - {self.name}"
+        suffix = ""
+        if self.is_default and self.archived_at is None:
+            suffix = " (Default)"
+        return f"{self.user.username} - {self.name}{suffix}"
+
+    @property
+    def is_archived(self) -> bool:
+        return self.archived_at is not None
+
+    def save(self, *args, **kwargs):
+        """
+        Ensure that at most one active (non-archived) portfolio per user
+        is marked as default.
+        """
+        super().save(*args, **kwargs)
+        if self.is_default and self.archived_at is None:
+            Portfolio.objects.filter(
+                user=self.user,
+                is_default=True,
+                archived_at__isnull=True,
+            ).exclude(pk=self.pk).update(is_default=False)
 
 
 class Position(models.Model):

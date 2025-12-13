@@ -1,10 +1,10 @@
 from __future__ import annotations
 from .models import Portfolio, Position, Trade
-from BE1.MRKT_WTCH import get_current_prices, POPULAR
+from .market_data import get_current_prices, POPULAR
 from optnstrdr.models import OptionPosition
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Any
 from decimal import Decimal
 
 from openai import OpenAI
@@ -14,9 +14,6 @@ from django.http import JsonResponse, HttpRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction
-
-from .models import Portfolio, Position, Trade
-from BE1.MRKT_WTCH import get_current_prices, POPULAR
 
 load_dotenv()
 DEFAULT_INITIAL_CASH = Decimal(os.environ.get("FB_DEFAULT_PORTFOLIO_CASH", "100000.00"))
@@ -40,9 +37,11 @@ def american_assistant(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
     snapshot = payload.get("snapshot")
-    if not isinstance(snapshot, dict) or "inputs" not in snapshot or "american_result" not in snapshot:
+    if not isinstance(snapshot, dict):
         return JsonResponse(
-            {"error": "snapshot with inputs and american_result is required"},
+            {
+                "error": "snapshot with inputs and american_result is required",
+            },
             status=400,
         )
 
@@ -67,9 +66,10 @@ def american_assistant(request: HttpRequest) -> JsonResponse:
         "You receive snapshots of American option pricing runs as JSON and explain them to the user. "
         "The snapshot has two keys: 'inputs' (pricing inputs like S, K, r, q, sigma, T, side, symbol, "
         "as_of, expiry, d1, d2) and 'american_result' (american_price, european_price, "
-        "early_exercise_premium, critical_price).  When you structure your response give the real world names not the data point names"
-        "Explain what the numbers mean in plain English, focusing on intuition, risk, and exercise logic. "
-        "Keep answers concise and structured with short paragraphs or bullet points."
+        "early_exercise_premium, critical_price).  When you structure your response give the real world "
+        "names (stock price, strike price, volatility, time to expiration, etc.) not the raw data field "
+        "names from the JSON. Explain what the numbers mean in plain English, focusing on intuition, risk, "
+        "and exercise logic. Keep answers concise and structured with short paragraphs or bullet points."
     )
 
     snapshot_text = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False)
@@ -78,7 +78,7 @@ def american_assistant(request: HttpRequest) -> JsonResponse:
         {"role": "system", "content": system_prompt},
         {
             "role": "system",
-            "content": f"Here is the latest American option snapshot as JSON: {snapshot_text}",
+            "content": f"Here is the latest pricing snapshot JSON: {snapshot_text}",
         },
     ]
     messages.extend(user_messages)
@@ -118,9 +118,11 @@ def euro_assistant(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
     snapshot = payload.get("snapshot")
-    if not isinstance(snapshot, dict) or "inputs" not in snapshot or "price_and_greeks" not in snapshot:
+    if not isinstance(snapshot, dict):
         return JsonResponse(
-            {"error": "snapshot with inputs and price_and_greeks is required"},
+            {
+                "error": "snapshot with inputs and greeks is required",
+            },
             status=400,
         )
 
@@ -143,11 +145,11 @@ def euro_assistant(request: HttpRequest) -> JsonResponse:
     system_prompt = (
         "You are FinanceBud, an options-education assistant inside the FinanceBuddy app. "
         "You receive snapshots of European option pricing runs as JSON and explain them to the user. "
-        "The snapshot has two keys: 'inputs' (symbol, side, S, K, r, q, sigma, T, as_of, expiry)  "
-        "and 'price_and_greeks' (fair_value, delta, gamma, theta, vega, rho). If critical price is too high, it will list N/A explain why (too close to european option, no early exercise premium)"
-        "Explain what the fair value and each Greek mean in practical terms for the trader, "
-        "including how they relate to price moves, volatility, time decay, and interest rates. "
-        "Keep answers concise and structured with short paragraphs or bullet points."
+        "The snapshot has two keys: 'inputs' (pricing inputs like S, K, r, q, sigma, T, side, symbol, expiry, d1, d2) "
+        "and 'greeks' (fair_value, delta, gamma, theta, vega, rho).  When you structure your response give the real "
+        "world names (stock price, strike price, volatility, time to expiration, etc.) not the raw data field names "
+        "from the JSON. Explain what the numbers mean in plain English, focusing on intuition and risk. Keep answers "
+        "concise and structured with short paragraphs or bullet points."
     )
 
     snapshot_text = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False)
@@ -156,7 +158,7 @@ def euro_assistant(request: HttpRequest) -> JsonResponse:
         {"role": "system", "content": system_prompt},
         {
             "role": "system",
-            "content": f"Here is the latest European option snapshot as JSON: {snapshot_text}",
+            "content": f"Here is the latest pricing snapshot JSON: {snapshot_text}",
         },
     ]
     messages.extend(user_messages)
@@ -195,48 +197,82 @@ def _get_authenticated_user(request: HttpRequest):
 
 
 def _get_or_create_default_portfolio(user) -> Portfolio:
+    """
+    Return the user's default, active (non-archived) portfolio, creating one if needed.
+    """
+    base_qs = Portfolio.objects.filter(
+        user=user,
+        is_active=True,
+        archived_at__isnull=True,
+    )
+
     portfolio = (
-        Portfolio.objects.filter(user=user, is_active=True)
-        .order_by("id")
+        base_qs.filter(is_default=True)
+        .order_by("created_at", "id")
         .first()
     )
+
+    if portfolio is None:
+        portfolio = base_qs.order_by("created_at", "id").first()
+
     if portfolio is None:
         portfolio = Portfolio.objects.create(
             user=user,
             name="Default Portfolio",
             initial_cash=DEFAULT_INITIAL_CASH,
             cash_balance=DEFAULT_INITIAL_CASH,
-            currency="USD",
+            is_default=True,
         )
+
     return portfolio
 
 
 @require_GET
 def portfolio_summary(request: HttpRequest) -> JsonResponse:
+    """
+    GET /api/portfolio/summary/
+
+    Query params:
+      - portfolio_id (optional): fetch a specific portfolio for this user.
+        If omitted, we fall back to that user's default portfolio.
+    """
     user, error_response = _get_authenticated_user(request)
     if error_response is not None:
         return error_response
 
-    portfolio = _get_or_create_default_portfolio(user)
-    positions = list(portfolio.positions.all().order_by("symbol"))
+    portfolio_id_raw = request.GET.get("portfolio_id")
+    if portfolio_id_raw:
+        try:
+            portfolio_id = int(portfolio_id_raw)
+        except ValueError:
+            return JsonResponse({"error": "Invalid portfolio_id"}, status=400)
+        try:
+            portfolio = Portfolio.objects.get(id=portfolio_id, user=user)
+        except Portfolio.DoesNotExist:
+            return JsonResponse({"error": "Portfolio not found"}, status=404)
+    else:
+        portfolio = _get_or_create_default_portfolio(user)
 
+    positions = Position.objects.filter(portfolio=portfolio)
     symbols = [p.symbol for p in positions]
-    market_data = {}
-    market_error = None
+
+    market_data: Dict[str, Dict[str, Any]] = {}
+    market_error: str | None = None
 
     if symbols:
         try:
             market_data = get_current_prices(symbols)
-        except RuntimeError as e:
-            market_error = str(e)
+        except RuntimeError as exc:
+            market_error = str(exc)
             market_data = {}
 
+    positions_payload: List[Dict[str, Any]] = []
     total_positions_value = Decimal("0")
 
-    positions_payload = []
     for pos in positions:
         info = market_data.get(pos.symbol) or {}
         price_val = info.get("price")
+
         if price_val is None:
             market_price = None
             market_value = None
@@ -250,26 +286,25 @@ def portfolio_summary(request: HttpRequest) -> JsonResponse:
 
         positions_payload.append(
             {
+                "id": pos.id,
                 "symbol": pos.symbol,
                 "quantity": float(pos.quantity),
                 "avg_cost": float(pos.avg_cost),
                 "market_price": float(market_price) if market_price is not None else None,
                 "market_value": float(market_value) if market_value is not None else None,
                 "unrealized_pnl": float(unrealized_pnl) if unrealized_pnl is not None else None,
-                "error": info.get("error"),
             }
         )
 
     options_total_value = Decimal("0")
     option_positions_qs = (
-        OptionPosition.objects
-        .filter(portfolio=portfolio)
+        OptionPosition.objects.filter(portfolio=portfolio)
         .select_related("contract")
     )
 
     for opt_pos in option_positions_qs:
-        qty = opt_pos.quantity
-        cost = opt_pos.avg_cost
+        qty = opt_pos.quantity  # Decimal
+        cost = opt_pos.avg_cost  # Decimal
         mult_int = opt_pos.contract.multiplier or 0
         mult = Decimal(str(mult_int))
         options_total_value += qty * cost * mult
@@ -283,16 +318,123 @@ def portfolio_summary(request: HttpRequest) -> JsonResponse:
             "portfolio": {
                 "id": portfolio.id,
                 "name": portfolio.name,
-                "currency": portfolio.currency,
                 "initial_cash": float(portfolio.initial_cash),
                 "cash_balance": float(portfolio.cash_balance),
                 "positions_value": float(total_positions_value),
                 "total_equity": float(total_equity),
+                "is_default": bool(portfolio.is_default),
+                "created_at": portfolio.created_at.isoformat(),
             },
             "positions": positions_payload,
             "market_error": market_error,
         }
     )
+
+
+@csrf_exempt
+@require_POST
+def create_portfolio(request: HttpRequest) -> JsonResponse:
+    user, error_response = _get_authenticated_user(request)
+    if error_response is not None:
+        return error_response
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    name = str(data.get("name") or "").strip()
+    initial_cash_raw = data.get("initial_cash")
+
+    if not name:
+        return JsonResponse({"error": "name is required"}, status=400)
+
+    try:
+        initial_cash = Decimal(str(initial_cash_raw))
+    except Exception:
+        return JsonResponse({"error": "initial_cash must be numeric"}, status=400)
+
+    portfolio = Portfolio.objects.create(
+        user=user,
+        name=name,
+        initial_cash=initial_cash,
+        cash_balance=initial_cash,
+        is_default=False,
+    )
+
+    return JsonResponse(
+        {
+            "id": portfolio.id,
+            "name": portfolio.name,
+            "initial_cash": float(portfolio.initial_cash),
+            "cash_balance": float(portfolio.cash_balance),
+            "is_default": portfolio.is_default,
+            "created_at": portfolio.created_at.isoformat(),
+        },
+        status=201,
+    )
+
+
+@csrf_exempt
+@require_POST
+def set_default_portfolio(request: HttpRequest) -> JsonResponse:
+    user, error_response = _get_authenticated_user(request)
+    if error_response is not None:
+        return error_response
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    portfolio_id = data.get("portfolio_id")
+    if portfolio_id is None:
+        return JsonResponse({"error": "portfolio_id is required"}, status=400)
+
+    try:
+        portfolio = Portfolio.objects.get(id=portfolio_id, user=user)
+    except Portfolio.DoesNotExist:
+        return JsonResponse({"error": "Portfolio not found"}, status=404)
+
+    with transaction.atomic():
+        Portfolio.objects.filter(user=user, is_default=True).update(is_default=False)
+        portfolio.is_default = True
+        portfolio.save(update_fields=["is_default"])
+
+    return JsonResponse({"status": "ok"})
+
+
+@csrf_exempt
+@require_POST
+def delete_portfolio(request: HttpRequest) -> JsonResponse:
+    user, error_response = _get_authenticated_user(request)
+    if error_response is not None:
+        return error_response
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    portfolio_id = data.get("portfolio_id")
+    if portfolio_id is None:
+        return JsonResponse({"error": "portfolio_id is required"}, status=400)
+
+    try:
+        portfolio = Portfolio.objects.get(id=portfolio_id, user=user)
+    except Portfolio.DoesNotExist:
+        return JsonResponse({"error": "Portfolio not found"}, status=404)
+
+    if portfolio.is_default:
+        return JsonResponse(
+            {"error": "Cannot delete the default portfolio"}, status=400
+        )
+
+    portfolio.is_active = False
+    portfolio.archived_at = portfolio.archived_at or portfolio.created_at
+    portfolio.save(update_fields=["is_active", "archived_at"])
+
+    return JsonResponse({"status": "ok"})
 
 
 @csrf_exempt
@@ -303,7 +445,7 @@ def execute_trade(request: HttpRequest) -> JsonResponse:
         return error_response
 
     try:
-        data = json.loads(request.body.decode("utf-8") or "{}")
+        data = json.loads(request.body.decode("utf-8"))
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
@@ -330,25 +472,11 @@ def execute_trade(request: HttpRequest) -> JsonResponse:
 
     if portfolio_id is not None:
         try:
-            portfolio = Portfolio.objects.get(
-                id=portfolio_id,
-                user=user,
-                is_active=True,
-            )
+            portfolio = Portfolio.objects.get(id=portfolio_id, user=user)
         except Portfolio.DoesNotExist:
             return JsonResponse({"error": "Portfolio not found"}, status=404)
     else:
         portfolio = _get_or_create_default_portfolio(user)
-
-    if fees_raw is None:
-        fees = Decimal("0")
-    else:
-        try:
-            fees = Decimal(str(fees_raw))
-        except Exception:
-            return JsonResponse({"error": "fees must be numeric"}, status=400)
-        if fees < 0:
-            return JsonResponse({"error": "fees cannot be negative"}, status=400)
 
     if price_raw is not None:
         try:
@@ -366,32 +494,51 @@ def execute_trade(request: HttpRequest) -> JsonResponse:
         info = quotes.get(symbol) or {}
         price_val = info.get("price")
         if price_val is None:
-            err_text = info.get("error") or "No price available for symbol"
             return JsonResponse(
-                {"error": err_text},
+                {"error": f"No price available for {symbol}"},
                 status=502,
             )
         price = Decimal(str(price_val))
 
+    fees = Decimal("0")
+    if fees_raw is not None:
+        try:
+            fees = Decimal(str(fees_raw))
+        except Exception:
+            return JsonResponse({"error": "fees must be numeric"}, status=400)
+        if fees < 0:
+            return JsonResponse({"error": "fees cannot be negative"}, status=400)
+
+    if side == Trade.Side.SELL:
+        quantity = -quantity
+
+    cash_delta = -(quantity * price + fees)
+
     with transaction.atomic():
-        portfolio = Portfolio.objects.select_for_update().get(id=portfolio.id)
+        portfolio.refresh_from_db()
+        new_cash_balance = portfolio.cash_balance + cash_delta
+        if new_cash_balance < 0:
+            return JsonResponse(
+                {"error": "Insufficient cash to execute this trade"}, status=400
+            )
+
+        portfolio.cash_balance = new_cash_balance
+        portfolio.save(update_fields=["cash_balance"])
+
+        trade = Trade.objects.create(
+            portfolio=portfolio,
+            symbol=symbol,
+            side=side,
+            quantity=quantity,
+            price=price,
+            fees=fees,
+        )
+
+        position = Position.objects.filter(
+            portfolio=portfolio, symbol=symbol
+        ).first()
 
         if side == Trade.Side.BUY:
-            total_cost = price * quantity + fees
-            if total_cost > portfolio.cash_balance:
-                return JsonResponse(
-                    {"error": "Insufficient cash for this trade"},
-                    status=400,
-                )
-
-            portfolio.cash_balance -= total_cost
-            portfolio.save()
-
-            position = (
-                Position.objects.select_for_update()
-                .filter(portfolio=portfolio, symbol=symbol)
-                .first()
-            )
             if position is None:
                 position = Position.objects.create(
                     portfolio=portfolio,
@@ -408,59 +555,26 @@ def execute_trade(request: HttpRequest) -> JsonResponse:
                         {"error": "Resulting position quantity would be non-positive"},
                         status=400,
                     )
-                new_cost = (old_qty * old_cost + quantity * price) / new_qty
+                new_avg_cost = (old_qty * old_cost + quantity * price) / new_qty
                 position.quantity = new_qty
-                position.avg_cost = new_cost
-                position.save()
-
-            trade = Trade.objects.create(
-                portfolio=portfolio,
-                symbol=symbol,
-                side=Trade.Side.BUY,
-                quantity=quantity,
-                price=price,
-                fees=fees,
-            )
-
+                position.avg_cost = new_avg_cost
+                position.save(update_fields=["quantity", "avg_cost"])
         else:
-            position = (
-                Position.objects.select_for_update()
-                .filter(portfolio=portfolio, symbol=symbol)
-                .first()
-            )
-            if position is None or position.quantity < quantity:
+            if position is None or position.quantity + quantity < 0:
                 return JsonResponse(
-                    {"error": "Insufficient position to sell"},
+                    {"error": "Cannot sell more than current position quantity"},
                     status=400,
                 )
 
-            total_proceeds = price * quantity - fees
-            portfolio.cash_balance += total_proceeds
-            portfolio.save()
-
-            new_qty = position.quantity - quantity
-            if new_qty <= 0:
+            new_qty = position.quantity + quantity
+            if new_qty == 0:
                 position.delete()
             else:
                 position.quantity = new_qty
-                position.save()
-
-            trade = Trade.objects.create(
-                portfolio=portfolio,
-                symbol=symbol,
-                side=Trade.Side.SELL,
-                quantity=quantity,
-                price=price,
-                fees=fees,
-            )
+                position.save(update_fields=["quantity"])
 
     return JsonResponse(
         {
-            "ok": True,
-            "portfolio": {
-                "id": portfolio.id,
-                "cash_balance": float(portfolio.cash_balance),
-            },
             "trade": {
                 "id": trade.id,
                 "symbol": trade.symbol,
@@ -468,7 +582,12 @@ def execute_trade(request: HttpRequest) -> JsonResponse:
                 "quantity": float(trade.quantity),
                 "price": float(trade.price),
                 "fees": float(trade.fees),
-                "executed_at": trade.executed_at.isoformat(),
+                "created_at": trade.created_at.isoformat(),
             },
-        }
+            "portfolio": {
+                "id": portfolio.id,
+                "cash_balance": float(portfolio.cash_balance),
+            },
+        },
+        status=201,
     )

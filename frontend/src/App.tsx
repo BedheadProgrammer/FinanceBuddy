@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-import { Container } from "@mui/material";
+import { Box } from "@mui/material";
 import type { ReactElement } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
@@ -31,16 +31,20 @@ function ProtectedRoute({ children }: ProtectedRouteProps): ReactElement {
 
 function App(): ReactElement {
   return (
-    <>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100vh",
+      }}
+    >
       <NavBar />
-      <Container maxWidth={false} disableGutters>
+      <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <Routes>
-          {/* Public routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Protected routes */}
           <Route
             path="/dashboard"
             element={
@@ -88,9 +92,9 @@ function App(): ReactElement {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </Container>
+      </Box>
       <Footer />
-    </>
+    </Box>
   );
 }
 

@@ -31,10 +31,10 @@ export function Landing() {
       >
         <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
           <Typography variant="h2" color="white" fontWeight="bold" gutterBottom>
-            Options Pricing Made Simple
+            Financial Literacy Platform
           </Typography>
           <Typography variant="h5" color="white" sx={{ mb: 4, opacity: 0.9 }}>
-            Real-time American & European options pricing with advanced Greeks visualization
+            Virtual Stock Exchange & Option Sensitivity Pricing
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
             <Button
@@ -63,7 +63,6 @@ export function Landing() {
         </Container>
       </Box>
 
-      {/* Features Section */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Typography variant="h4" textAlign="center" fontWeight="bold" gutterBottom sx={{ mb: 6 }}>
           Why Choose Our Platform?
@@ -75,7 +74,6 @@ export function Landing() {
             gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
           }}
         >
-          {/* Feature 1 */}
           <Stack spacing={2} alignItems="center" textAlign="center">
             <Box
               sx={{
@@ -91,15 +89,14 @@ export function Landing() {
               <TrendingUpIcon sx={{ fontSize: 40, color: 'white' }} />
             </Box>
             <Typography variant="h5" fontWeight="600">
-              Real-time Ready
+              Simulated Stock Market
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Integrate market data and compute prices in seconds with calm, legible visuals.
+              Execute on trades and realize strategies
             </Typography>
           </Stack>
 
-          {/* Feature 2 */}
-          <Stack spacing={2} alignItems="center" textAlign="center">
+                    <Stack spacing={2} alignItems="center" textAlign="center">
             <Box
               sx={{
                 width: 80,
@@ -121,7 +118,6 @@ export function Landing() {
             </Typography>
           </Stack>
 
-          {/* Feature 3 */}
           <Stack spacing={2} alignItems="center" textAlign="center">
             <Box
               sx={{
@@ -140,7 +136,7 @@ export function Landing() {
               Save and Compare
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Organize scenarios, export results, and revisit saved predictions anytime.
+              Keep multiple portfolios and strategies
             </Typography>
           </Stack>
         </Box>

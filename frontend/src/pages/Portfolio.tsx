@@ -1,5 +1,14 @@
-import { useEffect } from "react";
-import { Box, Grid, Typography, Stack, Container } from "@mui/material";
+import { useEffect, type ChangeEvent } from "react";
+import {
+  Box,
+  Grid,
+  Typography,
+  Stack,
+  Container,
+  TextField,
+  MenuItem,
+  Chip,
+} from "@mui/material";
 import { usePageMeta } from "../hooks/usePageMeta";
 import { usePortfolioSummary } from "../hooks/usePortfolioSummary";
 import { useStockTrade, useSellStock } from "../hooks/useStockTrade";
@@ -10,17 +19,41 @@ import { usePortfolioAssistant } from "../hooks/usePortfolioAssistant";
 import { colors, typography } from "../constants/theme";
 import { GridItem } from "../components/common";
 import { BuyStockForm, BuyOptionsForm, PortfolioOverview } from "../components/portfolio";
+import { usePortfolioContext } from "../store/portfolio";
 
 export default function Portfolio() {
   usePageMeta("Portfolio | FinanceBuddy", "Virtual Stock Exchange Portfolio");
 
+  // Disable the gradient background for this page
+  useEffect(() => {
+    const originalBackground = document.body.style.background;
+    const originalAnimation = document.body.style.animation;
+
+    document.body.style.background = colors.pageBg;
+    document.body.style.animation = "none";
+
+    return () => {
+      document.body.style.background = originalBackground;
+      document.body.style.animation = originalAnimation;
+    };
+  }, []);
+
+  const {
+    portfolios,
+    activePortfolioId,
+    setActivePortfolioId,
+    loading: portfoliosLoading,
+    error: portfoliosError,
+  } = usePortfolioContext();
 
   const {
     summary,
     loading: summaryLoading,
     error: summaryError,
     refetch: refetchSummary,
-  } = usePortfolioSummary();
+  } = usePortfolioSummary({
+    portfolioId: activePortfolioId ?? undefined,
+  });
 
   const {
     positions: optionPositions,
@@ -30,13 +63,14 @@ export default function Portfolio() {
   } = useOptionPositions();
 
   const stockTrade = useStockTrade({
+    portfolioId: summary?.portfolio.id,
     onSuccess: refetchSummary,
   });
 
   const sellStock = useSellStock({
+    portfolioId: summary?.portfolio.id,
     onSuccess: refetchSummary,
   });
-
 
   const optionTrade = useOptionTrade({
     onSuccess: async (portfolioId: number) => {
@@ -45,14 +79,12 @@ export default function Portfolio() {
     },
   });
 
-
   const sellOption = useSellOption({
     onSuccess: async (portfolioId: number) => {
       await refetchSummary();
       await fetchOptionPositions(portfolioId);
     },
   });
-
 
   const optionExercise = useOptionExercise({
     onSuccess: async (portfolioId: number) => {
@@ -61,9 +93,7 @@ export default function Portfolio() {
     },
   });
 
-
   const assistant = usePortfolioAssistant();
-
 
   useEffect(() => {
     if (summary?.portfolio.id) {
@@ -73,25 +103,21 @@ export default function Portfolio() {
 
   const currency = summary?.portfolio.currency || "USD";
 
+  const handlePortfolioChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const nextId = Number(event.target.value);
+    if (!Number.isNaN(nextId)) {
+      setActivePortfolioId(nextId);
+    }
+  };
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
         backgroundColor: colors.pageBg,
-        backgroundImage: "none",
         py: 5,
-        position: "relative",
-        "&::before": {
-          content: '""',
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: colors.pageBg,
-          zIndex: -1,
-          pointerEvents: "none",
-        },
       }}
     >
       <Container
@@ -101,15 +127,21 @@ export default function Portfolio() {
           transformOrigin: "top center",
         }}
       >
-        <Box sx={{ mb: 5, textAlign: "center" }}>
+        <Box
+          sx={{
+            mb: 5,
+            textAlign: "center",
+          }}
+        >
           <Typography
-            variant="h3"
+            component="h1"
             sx={{
-              fontWeight: 700,
-              color: colors.textPrimary,
               fontFamily: typography.sans,
-              letterSpacing: "-0.02em",
-              mb: 1.5,
+              fontSize: { xs: "1.9rem", md: "2.4rem" },
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              color: colors.textPrimary,
+              mb: 1,
             }}
           >
             Virtual Stock Portfolio
@@ -125,6 +157,68 @@ export default function Portfolio() {
             Track your cash, holdings, and live P/L while placing simulated trades
           </Typography>
         </Box>
+
+        {portfoliosError && (
+          <Box sx={{ mb: 2, textAlign: "center" }}>
+            <Typography
+              sx={{
+                color: colors.negative,
+                fontSize: "0.9rem",
+              }}
+            >
+              {portfoliosError}
+            </Typography>
+          </Box>
+        )}
+
+        {portfolios.length > 0 && (
+          <Box sx={{ mb: 4 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="center"
+            >
+              <Typography
+                sx={{
+                  color: colors.textSecondary,
+                  fontSize: "0.85rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  fontWeight: 600,
+                }}
+              >
+                Active portfolio
+              </Typography>
+              <TextField
+                select
+                size="small"
+                value={activePortfolioId ?? ""}
+                onChange={handlePortfolioChange}
+                sx={{ minWidth: 220 }}
+                disabled={portfoliosLoading}
+              >
+                {portfolios.map((p) => (
+                  <MenuItem key={p.id} value={p.id}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography sx={{ fontSize: "0.9rem" }}>{p.name}</Typography>
+                      {p.is_default && (
+                        <Chip
+                          label="Default"
+                          size="small"
+                          sx={{
+                            height: 20,
+                            fontSize: "0.7rem",
+                          }}
+                        />
+                      )}
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+          </Box>
+        )}
 
         <Grid container spacing={4} justifyContent="center">
           <GridItem item xs={12} lg={5}>
@@ -160,7 +254,7 @@ export default function Portfolio() {
                 loading={optionTrade.loading}
                 error={optionTrade.error}
                 success={optionTrade.success}
-                onSubmit={optionTrade.handleSubmitTrade}
+                onSubmit={(e, snapshot) => optionTrade.handleSubmitTrade(e, snapshot)}
                 summary={summary}
               />
             </Stack>
@@ -172,7 +266,6 @@ export default function Portfolio() {
               summaryLoading={summaryLoading}
               summaryError={summaryError}
               currency={currency}
-
               sellStockSymbol={sellStock.sellSymbol}
               sellStockQuantity={sellStock.sellQuantity}
               setSellStockQuantity={sellStock.setSellQuantity}
@@ -182,11 +275,9 @@ export default function Portfolio() {
               onStockRowClick={sellStock.selectPosition}
               onStockClearSelection={sellStock.clearSelection}
               onSellStock={sellStock.handleSellStock}
-
               optionPositions={optionPositions}
               optionPositionsLoading={optionPositionsLoading}
               optionPositionsError={optionPositionsError}
-
               sellOptionId={sellOption.sellOptionId}
               sellOptionQuantity={sellOption.sellQuantity}
               setSellOptionQuantity={sellOption.setSellQuantity}
@@ -195,13 +286,13 @@ export default function Portfolio() {
               sellOptionSuccess={sellOption.success}
               onOptionRowClick={sellOption.selectPosition}
               onOptionClearSelection={sellOption.clearSelection}
-              onSellOption={(pos, qty) => sellOption.handleSellOption(pos, qty, summary)}
-
+              onSellOption={(pos, qty) =>
+                sellOption.handleSellOption(pos, qty, summary)
+              }
               optionExerciseLoadingId={optionExercise.loadingId}
               optionExerciseError={optionExercise.error}
               optionExerciseSuccess={optionExercise.success}
               onExerciseOption={(pos) => optionExercise.handleExerciseOption(pos, summary)}
-
               assistantOpen={assistant.open}
               assistantMessages={assistant.messages}
               assistantInput={assistant.input}

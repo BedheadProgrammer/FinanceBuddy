@@ -1,6 +1,9 @@
 export type TradeSide = "BUY" | "SELL";
+export type OptionSide = "CALL" | "PUT";
+export type OptionStyle = "EUROPEAN" | "AMERICAN";
 
-export type PortfolioInfo = {
+
+export interface PortfolioInfo {
   id: number;
   name: string;
   currency: string;
@@ -8,26 +11,29 @@ export type PortfolioInfo = {
   cash_balance: number;
   positions_value: number;
   total_equity: number;
-};
+  is_default?: boolean;
+  created_at?: string;
+}
 
-export type PortfolioPosition = {
+export interface PortfolioPosition {
   symbol: string;
   quantity: number;
   avg_cost: number;
   market_price: number | null;
   market_value: number | null;
   unrealized_pnl: number | null;
-  error?: string;
-};
+  error?: string | null;
+}
 
-export type PortfolioSummaryPayload = {
+export interface PortfolioSummaryPayload {
   portfolio: PortfolioInfo;
   positions: PortfolioPosition[];
   market_error: string | null;
-};
+}
 
-export type TradeResponse = {
+export interface TradeResponse {
   ok: boolean;
+  error?: string;
   portfolio: {
     id: number;
     cash_balance: number;
@@ -41,21 +47,17 @@ export type TradeResponse = {
     fees: number;
     executed_at: string;
   };
-  error?: string;
-};
+}
 
-export type AssistantMessage = {
+export interface AssistantMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
-};
+}
 
-export type OptionSide = "CALL" | "PUT";
-export type OptionStyle = "EUROPEAN" | "AMERICAN";
 
-export type OptionPositionApi = {
+export interface OptionPositionApi {
   id: number;
-  portfolio_id: number;
   contract_id: number;
   underlying_symbol: string;
   option_side: OptionSide;
@@ -65,18 +67,18 @@ export type OptionPositionApi = {
   multiplier: number;
   quantity: string;
   avg_cost: string;
-};
+}
 
-export type OptionPositionsApiResponse = {
+export interface OptionPositionsApiResponse {
   portfolio: {
     id: number;
     cash: string;
   };
   positions: OptionPositionApi[];
   error?: string;
-};
+}
 
-export type OptionPosition = {
+export interface OptionPosition {
   id: number;
   contract_id: number;
   underlying_symbol: string;
@@ -87,9 +89,9 @@ export type OptionPosition = {
   multiplier: number;
   quantity: number;
   avg_cost: number;
-};
+}
 
-export type OptionTradeResponse = {
+export interface OptionTradeResponse {
   trade: {
     id: number;
     portfolio_id: number;
@@ -98,10 +100,6 @@ export type OptionTradeResponse = {
     quantity: string;
     price: string;
     fees: string;
-    order_type: string;
-    status: string;
-    realized_pl: string;
-    underlying_price_at_execution: string | null;
     executed_at: string;
   };
   contract: {
@@ -112,7 +110,6 @@ export type OptionTradeResponse = {
     strike: string;
     expiry: string;
     multiplier: number;
-    contract_symbol: string | null;
   };
   portfolio: {
     id: number;
@@ -124,9 +121,9 @@ export type OptionTradeResponse = {
     avg_cost: string;
   } | null;
   error?: string;
-};
+}
 
-export type OptionExerciseResponse = {
+export interface OptionExerciseResponse {
   exercise: {
     id: number;
     portfolio_id: number;
@@ -147,7 +144,6 @@ export type OptionExerciseResponse = {
     strike: string;
     expiry: string;
     multiplier: number;
-    contract_symbol: string | null;
   };
   portfolio: {
     id: number;
@@ -159,4 +155,61 @@ export type OptionExerciseResponse = {
     avg_cost: string;
   } | null;
   error?: string;
-};
+}
+
+export interface Portfolio {
+  id: number;
+  name: string;
+  currency: string;
+  initial_cash: number;
+  cash_balance: number;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  positions_count?: number;
+  option_positions_count?: number;
+  cost_basis?: number;
+}
+
+export interface PortfolioListResponse {
+  portfolios: Portfolio[];
+  count: number;
+}
+
+export interface CreatePortfolioResponse {
+  portfolio: Portfolio;
+  message: string;
+  error?: string;
+}
+
+export interface UpdatePortfolioResponse {
+  portfolio: Portfolio;
+  message: string;
+  error?: string;
+}
+
+export interface DeletePortfolioResponse {
+  message: string;
+  had_positions: boolean;
+  new_default_id: number | null;
+  error?: string;
+}
+
+export interface SetDefaultPortfolioResponse {
+  portfolio: Portfolio;
+  message: string;
+  error?: string;
+}
+
+export interface CreatePortfolioInput {
+  name: string;
+  initial_cash: number;
+  currency?: string;
+  set_as_default?: boolean;
+}
+
+export interface UpdatePortfolioInput {
+  name?: string;
+}

@@ -25,6 +25,20 @@ type AuthResponse = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
+const AUTH_STORAGE_KEY = 'fb_isAuthenticated'
+
+function loadInitialAuthState(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+  try {
+    const stored = window.localStorage.getItem(AUTH_STORAGE_KEY)
+    return stored === 'true'
+  } catch {
+    return false
+  }
+}
+
 async function postJson(path: string, body: unknown): Promise<AuthResponse> {
   const resp = await fetch(path, {
     method: 'POST',
@@ -52,40 +66,57 @@ async function postJson(path: string, body: unknown): Promise<AuthResponse> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => loadInitialAuthState())
 
-  const login = useCallback(async (username: string, password: string) => {
-    setIsAuthenticated(false)
-    const payload = await postJson('/api/auth/login/', { username, password })
-
-    if (!payload.ok || typeof payload.username !== 'string') {
-      setIsAuthenticated(false)
-      throw new Error(payload.error || payload.detail || 'Invalid username or password')
+  const setAuth = useCallback((next: boolean) => {
+    setIsAuthenticated(next)
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(AUTH_STORAGE_KEY, next ? 'true' : 'false')
+      }
+    } catch {
+      // ignore storage errors (private mode, quota, etc.)
     }
-
-    setIsAuthenticated(true)
   }, [])
 
-  const register = useCallback(async (input: RegisterInput) => {
-    setIsAuthenticated(false)
-    const payload = await postJson('/api/auth/register/', {
-      username: input.username,
-      email: input.email,
-      password: input.password,
-      confirm: input.confirm,
-    })
+  const login = useCallback(
+    async (username: string, password: string) => {
+      setAuth(false)
+      const payload = await postJson('/api/auth/login/', { username, password })
 
-    if (!payload.ok || typeof payload.username !== 'string') {
-      setIsAuthenticated(false)
-      throw new Error(payload.error || payload.detail || 'Registration failed')
-    }
+      if (!payload.ok || typeof payload.username !== 'string') {
+        setAuth(false)
+        throw new Error(payload.error || payload.detail || 'Invalid username or password')
+      }
 
-    setIsAuthenticated(true)
-  }, [])
+      setAuth(true)
+    },
+    [setAuth],
+  )
+
+  const register = useCallback(
+    async (input: RegisterInput) => {
+      setAuth(false)
+      const payload = await postJson('/api/auth/register/', {
+        username: input.username,
+        email: input.email,
+        password: input.password,
+        confirm: input.confirm,
+      })
+
+      if (!payload.ok || typeof payload.username !== 'string') {
+        setAuth(false)
+        throw new Error(payload.error || payload.detail || 'Registration failed')
+      }
+
+      setAuth(true)
+    },
+    [setAuth],
+  )
 
   const logout = useCallback(() => {
-    setIsAuthenticated(false)
-  }, [])
+    setAuth(false)
+  }, [setAuth])
 
   const value = useMemo<AuthContextValue>(
     () => ({
