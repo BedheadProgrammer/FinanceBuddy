@@ -8,7 +8,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 import { AuthProvider } from './store/auth';
-
+import { PortfolioProvider } from './store/portfolio';
 const queryClient = new QueryClient();
 
 const theme = createTheme({
@@ -32,7 +32,9 @@ createRoot(document.getElementById('root') as HTMLElement).render(
         <BrowserRouter>
           <CssBaseline />
           <AuthProvider>
-            <App />
+            <PortfolioProvider>
+              <App />
+            </PortfolioProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>
