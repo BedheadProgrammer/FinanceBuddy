@@ -24,6 +24,7 @@ type BuyCryptoFormProps = {
   error: string | null;
   success: string | null;
   onSubmit: (e: React.FormEvent) => void;
+  embedded?: boolean;
 };
 
 export const BuyCryptoForm: React.FC<BuyCryptoFormProps> = ({
@@ -38,9 +39,10 @@ export const BuyCryptoForm: React.FC<BuyCryptoFormProps> = ({
   error,
   success,
   onSubmit,
+  embedded = false,
 }) => {
-  return (
-    <SectionCard>
+  const content = (
+    <>
       <Typography
         variant="h6"
         sx={{
@@ -131,9 +133,9 @@ export const BuyCryptoForm: React.FC<BuyCryptoFormProps> = ({
             fontWeight: 600,
             textTransform: "none",
             borderRadius: 2,
-            backgroundColor: colors.accent,
+            backgroundColor: "#f59e0b",
             "&:hover": {
-              backgroundColor: colors.accentHover,
+              backgroundColor: "#d97706",
             },
           }}
         >
@@ -144,6 +146,12 @@ export const BuyCryptoForm: React.FC<BuyCryptoFormProps> = ({
           )}
         </Button>
       </Box>
-    </SectionCard>
+    </>
   );
+
+  if (embedded) {
+    return <Box>{content}</Box>;
+  }
+
+  return <SectionCard>{content}</SectionCard>;
 };

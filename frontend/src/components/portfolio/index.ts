@@ -6,3 +6,5 @@ export { StockPositionsTable } from "./StockPositionsTable";
 export { OptionsPositionsTable } from "./OptionsPositionsTable";
 export { CryptoPositionsTable } from "./CryptoPositionsTable";
 export { PortfolioAssistant } from "./PortfolioAssistant";
+export { TradeTabs } from "./TradeTabs";
+export { PositionsTabs } from "./PositionsTabs";

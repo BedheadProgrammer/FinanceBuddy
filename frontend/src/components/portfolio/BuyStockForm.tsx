@@ -24,6 +24,7 @@ type BuyStockFormProps = {
   error: string | null;
   success: string | null;
   onSubmit: (e: React.FormEvent) => void;
+  embedded?: boolean;
 };
 
 export const BuyStockForm: React.FC<BuyStockFormProps> = ({
@@ -39,9 +40,10 @@ export const BuyStockForm: React.FC<BuyStockFormProps> = ({
   error,
   success,
   onSubmit,
+  embedded = false,
 }) => {
-  return (
-    <SectionCard>
+  const content = (
+    <>
       <Typography
         variant="h6"
         sx={{
@@ -158,6 +160,12 @@ export const BuyStockForm: React.FC<BuyStockFormProps> = ({
           )}
         </Stack>
       </Box>
-    </SectionCard>
+    </>
   );
+
+  if (embedded) {
+    return <Box>{content}</Box>;
+  }
+
+  return <SectionCard>{content}</SectionCard>;
 };

@@ -32,6 +32,7 @@ type BuyOptionsFormProps = {
   success: string | null;
   onSubmit: (e: React.FormEvent, summary: PortfolioSummaryPayload | null) => void;
   summary: PortfolioSummaryPayload | null;
+  embedded?: boolean;
 };
 
 export const BuyOptionsForm: React.FC<BuyOptionsFormProps> = ({
@@ -52,9 +53,10 @@ export const BuyOptionsForm: React.FC<BuyOptionsFormProps> = ({
   success,
   onSubmit,
   summary,
+  embedded = false,
 }) => {
-  return (
-    <SectionCard>
+  const content = (
+    <>
       <Typography
         variant="h6"
         sx={{
@@ -223,6 +225,12 @@ export const BuyOptionsForm: React.FC<BuyOptionsFormProps> = ({
           )}
         </Stack>
       </Box>
-    </SectionCard>
+    </>
   );
+
+  if (embedded) {
+    return <Box>{content}</Box>;
+  }
+
+  return <SectionCard>{content}</SectionCard>;
 };
