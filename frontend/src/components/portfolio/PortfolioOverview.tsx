@@ -12,10 +12,12 @@ import { colors } from "../../constants/theme";
 import { SectionCard, StatCard, GridItem } from "../common";
 import { StockPositionsTable } from "./StockPositionsTable";
 import { OptionsPositionsTable } from "./OptionsPositionsTable";
+import { CryptoPositionsTable } from "./CryptoPositionsTable";
 import { PortfolioAssistant } from "./PortfolioAssistant";
 import type {
   PortfolioSummaryPayload,
   OptionPosition,
+  CryptoPosition,
   AssistantMessage,
 } from "../../types/portfolio";
 
@@ -24,7 +26,6 @@ type PortfolioOverviewProps = {
   summaryLoading: boolean;
   summaryError: string | null;
   currency: string;
-  // Stock sell state
   sellStockSymbol: string | null;
   sellStockQuantity: number;
   setSellStockQuantity: (val: number) => void;
@@ -34,11 +35,9 @@ type PortfolioOverviewProps = {
   onStockRowClick: (symbol: string, maxQty: number) => void;
   onStockClearSelection: () => void;
   onSellStock: (symbol: string, quantity: number) => void;
-  // Option positions
   optionPositions: OptionPosition[];
   optionPositionsLoading: boolean;
   optionPositionsError: string | null;
-  // Option sell state
   sellOptionId: number | null;
   sellOptionQuantity: number;
   setSellOptionQuantity: (val: number) => void;
@@ -48,12 +47,23 @@ type PortfolioOverviewProps = {
   onOptionRowClick: (id: number, maxQty: number) => void;
   onOptionClearSelection: () => void;
   onSellOption: (pos: OptionPosition, quantity: number) => void;
-  // Option exercise
   optionExerciseLoadingId: number | null;
   optionExerciseError: string | null;
   optionExerciseSuccess: string | null;
   onExerciseOption: (pos: OptionPosition) => void;
-  // Assistant
+  cryptoPositions: CryptoPosition[];
+  cryptoPositionsLoading: boolean;
+  cryptoPositionsError: string | null;
+  sellCryptoSymbol: string | null;
+  sellCryptoQuantity: number;
+  setSellCryptoQuantity: (val: number) => void;
+  sellCryptoMaxQuantity: number;
+  sellCryptoLoading: boolean;
+  sellCryptoError: string | null;
+  sellCryptoSuccess: string | null;
+  onCryptoRowClick: (symbol: string, maxQty: number) => void;
+  onCryptoClearSelection: () => void;
+  onSellCrypto: (symbol: string, quantity: number) => void;
   assistantOpen: boolean;
   assistantMessages: AssistantMessage[];
   assistantInput: string;
@@ -94,6 +104,19 @@ export const PortfolioOverview: React.FC<PortfolioOverviewProps> = ({
   optionExerciseError,
   optionExerciseSuccess,
   onExerciseOption,
+  cryptoPositions,
+  cryptoPositionsLoading,
+  cryptoPositionsError,
+  sellCryptoSymbol,
+  sellCryptoQuantity,
+  setSellCryptoQuantity,
+  sellCryptoMaxQuantity,
+  sellCryptoLoading,
+  sellCryptoError,
+  sellCryptoSuccess,
+  onCryptoRowClick,
+  onCryptoClearSelection,
+  onSellCrypto,
   assistantOpen,
   assistantMessages,
   assistantInput,
@@ -204,6 +227,12 @@ export const PortfolioOverview: React.FC<PortfolioOverviewProps> = ({
             </Alert>
           )}
 
+          {summary.crypto_market_error && (
+            <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+              Crypto market data warning: {summary.crypto_market_error}
+            </Alert>
+          )}
+
           {sellStockError && (
             <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
               {sellStockError}
@@ -251,7 +280,7 @@ export const PortfolioOverview: React.FC<PortfolioOverviewProps> = ({
             />
           </Box>
 
-          <Box>
+          <Box sx={{ mb: 4 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
               <Typography
                 sx={{
@@ -318,6 +347,47 @@ export const PortfolioOverview: React.FC<PortfolioOverviewProps> = ({
               onClearSelection={onOptionClearSelection}
               onSell={onSellOption}
               onExercise={onExerciseOption}
+            />
+          </Box>
+
+          <Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+              <Typography
+                sx={{
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                  fontSize: "1rem",
+                }}
+              >
+                Crypto Positions
+              </Typography>
+              <Chip
+                label={cryptoPositions.length}
+                size="small"
+                sx={{
+                  backgroundColor: "rgba(245, 158, 11, 0.15)",
+                  color: "#f59e0b",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                }}
+              />
+            </Box>
+
+            <CryptoPositionsTable
+              positions={cryptoPositions}
+              currency={currency}
+              loading={cryptoPositionsLoading}
+              error={cryptoPositionsError}
+              sellSymbol={sellCryptoSymbol}
+              sellQuantity={sellCryptoQuantity}
+              setSellQuantity={setSellCryptoQuantity}
+              maxQuantity={sellCryptoMaxQuantity}
+              sellLoading={sellCryptoLoading}
+              sellError={sellCryptoError}
+              sellSuccess={sellCryptoSuccess}
+              onRowClick={onCryptoRowClick}
+              onClearSelection={onCryptoClearSelection}
+              onSell={onSellCrypto}
             />
           </Box>
 

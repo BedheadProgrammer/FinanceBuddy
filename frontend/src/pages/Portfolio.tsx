@@ -15,16 +15,18 @@ import { useStockTrade, useSellStock } from "../hooks/useStockTrade";
 import { useOptionPositions } from "../hooks/useOptionPositions";
 import { useOptionTrade, useSellOption } from "../hooks/useOptionTrade";
 import { useOptionExercise } from "../hooks/useOptionExercise";
+import { useCryptoAssets } from "../hooks/useCryptoAssets";
+import { useCryptoPositions } from "../hooks/useCryptoPositions";
+import { useCryptoTrade, useSellCrypto } from "../hooks/useCryptoTrade";
 import { usePortfolioAssistant } from "../hooks/usePortfolioAssistant";
 import { colors, typography } from "../constants/theme";
 import { GridItem } from "../components/common";
-import { BuyStockForm, BuyOptionsForm, PortfolioOverview } from "../components/portfolio";
+import { BuyStockForm, BuyOptionsForm, BuyCryptoForm, PortfolioOverview } from "../components/portfolio";
 import { usePortfolioContext } from "../store/portfolio";
 
 export default function Portfolio() {
   usePageMeta("Portfolio | FinanceBuddy", "Virtual Stock Exchange Portfolio");
 
-  // Disable the gradient background for this page
   useEffect(() => {
     const originalBackground = document.body.style.background;
     const originalAnimation = document.body.style.animation;
@@ -62,6 +64,19 @@ export default function Portfolio() {
     fetchPositions: fetchOptionPositions,
   } = useOptionPositions();
 
+  const {
+    positions: cryptoPositions,
+    loading: cryptoPositionsLoading,
+    error: cryptoPositionsError,
+    fetchPositions: fetchCryptoPositions,
+  } = useCryptoPositions();
+
+  const {
+    assets: cryptoAssets,
+    loading: cryptoAssetsLoading,
+    error: cryptoAssetsError,
+  } = useCryptoAssets();
+
   const stockTrade = useStockTrade({
     portfolioId: summary?.portfolio.id,
     onSuccess: refetchSummary,
@@ -93,13 +108,34 @@ export default function Portfolio() {
     },
   });
 
+  const cryptoTrade = useCryptoTrade({
+    portfolioId: summary?.portfolio.id,
+    onSuccess: async () => {
+      await refetchSummary();
+      if (summary?.portfolio.id) {
+        await fetchCryptoPositions(summary.portfolio.id);
+      }
+    },
+  });
+
+  const sellCrypto = useSellCrypto({
+    portfolioId: summary?.portfolio.id,
+    onSuccess: async () => {
+      await refetchSummary();
+      if (summary?.portfolio.id) {
+        await fetchCryptoPositions(summary.portfolio.id);
+      }
+    },
+  });
+
   const assistant = usePortfolioAssistant();
 
   useEffect(() => {
     if (summary?.portfolio.id) {
       fetchOptionPositions(summary.portfolio.id);
+      fetchCryptoPositions(summary.portfolio.id);
     }
-  }, [summary?.portfolio.id, fetchOptionPositions]);
+  }, [summary?.portfolio.id, fetchOptionPositions, fetchCryptoPositions]);
 
   const currency = summary?.portfolio.currency || "USD";
 
@@ -257,6 +293,20 @@ export default function Portfolio() {
                 onSubmit={(e, snapshot) => optionTrade.handleSubmitTrade(e, snapshot)}
                 summary={summary}
               />
+
+              <BuyCryptoForm
+                assets={cryptoAssets}
+                assetsLoading={cryptoAssetsLoading}
+                assetsError={cryptoAssetsError}
+                symbol={cryptoTrade.symbol}
+                setSymbol={cryptoTrade.setSymbol}
+                quantity={cryptoTrade.quantity}
+                setQuantity={cryptoTrade.setQuantity}
+                loading={cryptoTrade.loading}
+                error={cryptoTrade.error}
+                success={cryptoTrade.success}
+                onSubmit={cryptoTrade.handleSubmitTrade}
+              />
             </Stack>
           </GridItem>
 
@@ -293,6 +343,19 @@ export default function Portfolio() {
               optionExerciseError={optionExercise.error}
               optionExerciseSuccess={optionExercise.success}
               onExerciseOption={(pos) => optionExercise.handleExerciseOption(pos, summary)}
+              cryptoPositions={cryptoPositions}
+              cryptoPositionsLoading={cryptoPositionsLoading}
+              cryptoPositionsError={cryptoPositionsError}
+              sellCryptoSymbol={sellCrypto.sellSymbol}
+              sellCryptoQuantity={sellCrypto.sellQuantity}
+              setSellCryptoQuantity={sellCrypto.setSellQuantity}
+              sellCryptoMaxQuantity={sellCrypto.maxQuantity}
+              sellCryptoLoading={sellCrypto.loading}
+              sellCryptoError={sellCrypto.error}
+              sellCryptoSuccess={sellCrypto.success}
+              onCryptoRowClick={sellCrypto.selectPosition}
+              onCryptoClearSelection={sellCrypto.clearSelection}
+              onSellCrypto={sellCrypto.handleSellCrypto}
               assistantOpen={assistant.open}
               assistantMessages={assistant.messages}
               assistantInput={assistant.input}

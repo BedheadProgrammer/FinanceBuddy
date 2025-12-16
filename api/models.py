@@ -117,3 +117,72 @@ class Trade(models.Model):
 
     def __str__(self) -> str:
         return f"{self.side} {self.quantity} {self.symbol} @ {self.price}"
+
+
+class CryptoPosition(models.Model):
+    portfolio = models.ForeignKey(
+        Portfolio,
+        on_delete=models.CASCADE,
+        related_name="crypto_positions",
+    )
+    symbol = models.CharField(max_length=20)
+    quantity = models.DecimalField(max_digits=28, decimal_places=18)
+    avg_cost = models.DecimalField(max_digits=28, decimal_places=18)
+    created_at = models.DateTimeField(default=timezone.now)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("portfolio", "symbol")
+
+    def __str__(self) -> str:
+        return f"{self.portfolio} - {self.symbol}"
+
+
+class CryptoTrade(models.Model):
+    class Side(models.TextChoices):
+        BUY = "BUY", "Buy"
+        SELL = "SELL", "Sell"
+
+    class OrderType(models.TextChoices):
+        MARKET = "MARKET", "Market"
+        LIMIT = "LIMIT", "Limit"
+
+    class Status(models.TextChoices):
+        FILLED = "FILLED", "Filled"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    portfolio = models.ForeignKey(
+        Portfolio,
+        on_delete=models.CASCADE,
+        related_name="crypto_trades",
+    )
+    symbol = models.CharField(max_length=20)
+    side = models.CharField(max_length=4, choices=Side.choices)
+    quantity = models.DecimalField(max_digits=28, decimal_places=18)
+    price = models.DecimalField(max_digits=28, decimal_places=18)
+    order_type = models.CharField(
+        max_length=10,
+        choices=OrderType.choices,
+        default=OrderType.MARKET,
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.FILLED,
+    )
+    fees = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    realized_pl = models.DecimalField(
+        max_digits=18,
+        decimal_places=8,
+        blank=True,
+        null=True,
+    )
+    executed_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return f"{self.side} {self.quantity} {self.symbol} @ {self.price}"
